@@ -15,6 +15,8 @@ const users = require("./routes/users");
 const news = require("./routes/news");
 const subscription = require("./routes/subscription");
 const events = require("./routes/events");
+const adminLogs = require("./routes/adminLogs");
+const emergencyContacts = require("./routes/emergencyContact")
 
 // app instance
 const app = express();
@@ -36,6 +38,8 @@ app.use("/api/users", users)
 app.use("/api/news", news)
 app.use("/api/subscriptions", subscription)
 app.use("/api/events", events)
+app.use("/api/adminLogs", adminLogs)
+app.use("/api/emergencyContacts", emergencyContacts)
 
 PORT = process.env.PORT;
 app.listen(PORT, () => {

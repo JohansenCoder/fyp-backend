@@ -6,7 +6,7 @@ const { getAllAnnouncements, createAnnouncement, getAnnouncementById, updateAnno
 // get all announcements
 router.get("/", getAllAnnouncements);
 // post announcement
-router.post("/new" , createAnnouncement);
+router.post("/" , createAnnouncement);
 
 // get announcement by id
 router.get("/:id", getAnnouncementById);
