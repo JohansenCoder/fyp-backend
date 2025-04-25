@@ -12,6 +12,9 @@ const logger = require("./middlewares/logger");
 // route imports
 const announcements = require("./routes/announcements");
 const users = require("./routes/users");
+const news = require("./routes/news");
+const subscription = require("./routes/subscription");
+const events = require("./routes/events");
 
 // app instance
 const app = express();
@@ -30,6 +33,9 @@ app.get("/", (req, res) => {
 
 app.use("/api/announcements", announcements)
 app.use("/api/users", users)
+app.use("/api/news", news)
+app.use("/api/subscriptions", subscription)
+app.use("/api/events", events)
 
 PORT = process.env.PORT;
 app.listen(PORT, () => {

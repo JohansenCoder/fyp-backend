@@ -1,4 +1,4 @@
-const User = require("../models/User");
+const User = require("../models/UserSchema");
 const bcrypt = require("bcryptjs");
 
 exports.getAllUsers = async (req, res) => {
@@ -57,6 +57,7 @@ exports.updateUser = async (req, res) => {
         message: "User updated successfully",
         user: req.body
     })
+    
 }
 
 exports.deleteUser = async (req, res) => {

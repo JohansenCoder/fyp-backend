@@ -1,14 +1,27 @@
 const express = require("express");
 const router = express.Router();
+const { getAllAnnouncements, createAnnouncement, getAnnouncementById, updateAnnouncement, deleteAnnouncement } = require("../controllers/announcementController");
 
 
 // get all announcements
-router.get("/", (req, res) => {
-    console.log("Getting all announcements...")
-} )
+router.get("/", getAllAnnouncements);
 // post announcement
-router.post("/new" , (req,res) => {
-    console.log("Posting new announcement...")
-})
+router.post("/new" , createAnnouncement);
+
+// get announcement by id
+router.get("/:id", getAnnouncementById);
+
+// update announcement
+router.put("/:id", updateAnnouncement);
+
+// delete announcement
+router.delete("/:id", deleteAnnouncement);
+
+
+
+
+
+
+
 
 module.exports = router;
