@@ -4,13 +4,16 @@ const mongoose = require('mongoose');
 const SubscriptionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
+  eventType: { type: String }, // e.g., "webinar", "social"
+  college: { type: String }, // Optional, for college-specific subscriptions
   subscribedAt: { type: Date, default: Date.now },
   reminderSent: { type: Boolean, default: false },
   status: {
     type: String,
-    enum: ['subscribed', 'cancelled'],
+    enum: ['subscribed', 'Unsubscribed', 'Pending'],
     default: 'subscribed'
   }
 });
 
 module.exports = mongoose.model('Subscription', SubscriptionSchema);
+

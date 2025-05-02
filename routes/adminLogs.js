@@ -1,15 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const { createAdminLog, getAllAdminLogs, getAdminLogById } = require('../controllers/adminLogController');
+const { protect, authorize } = require('../middlewares/auth');
 
 // create admin log
-router.post('/', createAdminLog);
+router.post('/', protect, authorize('admin'), createAdminLog);
 
 // get all admin logs
-router.get('/', getAllAdminLogs);
+router.get('/',protect, authorize('admin'), getAllAdminLogs);
 
 // get admin log by id
-router.get('/:id', getAdminLogById);
+router.get('/:id', protect, authorize('admin'), getAdminLogById);
 
 
 module.exports = router;

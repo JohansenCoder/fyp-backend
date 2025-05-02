@@ -1,61 +1,30 @@
+// src/models/User.js
 const mongoose = require('mongoose');
 
-const UserSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: {
-    type: String,
-    required: function () {
-      return this.role !== 'visitor';
+const userSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true, trim: true },
+    email: { type: String, required: true, unique: true, trim: true },
+    password: { type: String, required: true }, // Hashed
+    role: { type: String, enum: ['student', 'staff', 'alumni', 'admin'], required: true },
+    college: { type: String, required: true }, // e.g., "CoICT", "MCHAS"
+    profile: {
+        firstName: { type: String },
+        lastName: { type: String },
+        department: { type: String }, // For students/staff
+        graduationYear: { type: Number }, // For alumni
+        phone: { type: String },
+        faculty: { type: String }, // For faculty-specific admins
     },
-    unique: true
-  },
-  password: {
-    type: String,
-    required: function () {
-      return ['alumni', 'admin'].includes(this.role);
+    token: { type: String }, // Added token field
+    interests: [String], // e.g., ["webinars", "hackathons"]
+    notificationPreferences: {
+        newEvents: { type: Boolean, default: true },
+        reminders: { type: Boolean, default: true },
+        cancellations: { type: Boolean, default: true }
     },
-    select: false // hide password on default queries
-  },
-  role: {
-    type: String,
-    enum: ['student', 'staff', 'alumni', 'admin', 'visitor'],
-    required: true
-  },
-  faculty: {
-    type: String // e.g., COICT, Law, etc.
-  },
-  department: {
-    type: String // optional
-  },
-  deviceToken: {
-    type: String // for FCM
-  },
-  location: {
-    coordinates: {
-      type: [Number], // [longitude, latitude]
-      index: '2dsphere'
-    },
-    updatedAt: Date
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  alumniDetails: {
-    graduationYear: Number,
-    industry: String,
-    company: String,
-    linkedIn: String,
-    isVerified: Boolean
-  },
-  isAdmin: {
-    type: Boolean,
-    default: false
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
+    fcmToken: { type: String }, // Firebase Cloud Messaging token
+    lastActive: { type: Date, default: Date.now }, // For session timeout
+    createdAt: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('User', userSchema);

@@ -1,4 +1,4 @@
- const AdminLog = require('../models/AdminLogSchema');
+ const AdminLog = require('../models/AuditLog');
 
 
  exports.createAdminLog = async (req, res) => {
