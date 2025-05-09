@@ -4,13 +4,13 @@ const { createAdminLog, getAllAdminLogs, getAdminLogById } = require('../control
 const { protect, authorize } = require('../middlewares/auth');
 
 // create admin log
-router.post('/', protect, authorize('admin'), createAdminLog);
+router.post('/', createAdminLog);
 
 // get all admin logs
-router.get('/',protect, authorize('admin'), getAllAdminLogs);
+router.get('/', getAllAdminLogs);
 
 // get admin log by id
-router.get('/:id', protect, authorize('admin'), getAdminLogById);
+router.get('/:id', getAdminLogById);
 
 
 module.exports = router;

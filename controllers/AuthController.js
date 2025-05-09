@@ -5,7 +5,7 @@ const User = require('../models/UserSchema');
 const AuditLog = require('../models/AuditLog');
 const sanitize = require('mongo-sanitize');
 const { sendEmail } = require('../services/emailService');
-const { handleFailedLogin,authSecurity } = require('../middlewares/authSecurity');
+const { handleFailedLogin, authSecurity } = require('../middlewares/authSecurity');
 const winston = require('winston');
 
 const logger = winston.createLogger({
@@ -14,16 +14,23 @@ const logger = winston.createLogger({
 
 exports.register = async (req, res) => {
     try {
-        let { username, email, password, role, profile } = req.body;
+        // Added 'college' to destructured fields
+        let { username, email, password, role, college, profile } = req.body;
 
         // Sanitize inputs
         username = sanitize(username);
         email = sanitize(email);
+        college = sanitize(college); // Sanitize college field
         if (profile) {
             profile.firstName = sanitize(profile.firstName);
             profile.lastName = sanitize(profile.lastName);
             profile.department = sanitize(profile.department);
             profile.faculty = sanitize(profile.faculty);
+        }
+
+        // Validate required fields
+        if (!username || !email || !password || !role || !college) {
+            return res.status(400).json({ message: 'All required fields (username, email, password, role, college) must be provided' });
         }
 
         // Check for existing user
@@ -35,12 +42,13 @@ exports.register = async (req, res) => {
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create user
+        // Create user with college field
         const user = new User({
             username,
             email,
             password: hashedPassword,
             role,
+            college, // Include college
             profile,
         });
         await user.save();
@@ -52,12 +60,20 @@ exports.register = async (req, res) => {
             { expiresIn: '15m' }
         );
 
+        // Log successful registration
+        await AuditLog.create({
+            action: 'user_registration',
+            performedBy: user._id,
+            details: `User ${username} registered with role ${role} and college ${college}`,
+        });
+
         res.status(201).json({
             token,
             user: {
                 id: user._id,
                 username: user.username,
                 role: user.role,
+                college: user.college, // Include college in response
                 profile: user.profile,
             },
         });
@@ -128,12 +144,20 @@ exports.login = async (req, res) => {
         user.lastActive = Date.now();
         await user.save();
 
+        // Log successful login
+        await AuditLog.create({
+            action: 'user_login',
+            performedBy: user._id,
+            details: `User ${username} logged in`,
+        });
+
         res.json({
             token,
             user: {
                 id: user._id,
                 username: user.username,
                 role: user.role,
+                college: user.college, // Include college in response
                 profile: user.profile,
             },
         });
@@ -157,6 +181,14 @@ exports.forgotPassword = async (req, res) => {
             text: `Use this token to reset your password: ${resetToken}\nLink: http://localhost:7000/reset-password?token=${resetToken}`,
             html: `<p>Use this token to reset your password: <b>${resetToken}</b></p><p><a href="http://localhost:7000/reset-password?token=${resetToken}">Reset Password</a></p>`,
         });
+
+        // Log password reset request
+        await AuditLog.create({
+            action: 'password_reset_request',
+            performedBy: user._id,
+            details: `Password reset requested for ${email}`,
+        });
+
         res.json({ message: 'Password reset link sent' });
     } catch (error) {
         logger.error(`Forgot password error for ${req.body.email}: ${error.message}`);
@@ -179,13 +211,27 @@ exports.resetPassword = async (req, res) => {
         user.password = await bcrypt.hash(password, 10);
         await user.save();
 
+        // Log password reset
+        await AuditLog.create({
+            action: 'password_reset',
+            performedBy: user._id,
+            details: `Password reset for ${user.username}`,
+        });
+
         res.json({ message: 'Password reset successfully' });
     } catch (error) {
+        logger.error(`Password reset error: ${error.message}`);
         res.status(500).json({ message: 'Password reset failed', error: error.message });
     }
 };
 
 exports.logout = (req, res) => {
     // Client-side should discard token
+    // Log logout
+    AuditLog.create({
+        action: 'user_logout',
+        performedBy: req.user ? req.user.id : null,
+        details: `User logged out`,
+    });
     res.json({ message: 'Logged out successfully' });
 };

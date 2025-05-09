@@ -4,18 +4,18 @@ const { getAllSubscriptions, createSubscription, getSubscriptionById, updateSubs
 const { protect, authorize } = require('../middlewares/auth');  
 
 // get all subscriptions
-router.get("/",  protect, authorize('admin', 'student', 'staff', 'alumni'), getAllSubscriptions);
+router.get("/", getAllSubscriptions);
 // post subscription
-router.post("/new" ,  protect, authorize('admin', 'student', 'staff', 'alumni'), createSubscription);
+router.post("/new" , createSubscription);
 
 // get subscription by id
-router.get("/:id",  protect, authorize('admin', 'student', 'staff', 'alumni'), getSubscriptionById);
+router.get("/:id",  getSubscriptionById);
 
 // update subscription
-router.put("/:id",  protect, authorize('admin', 'student', 'staff', 'alumni'), updateSubscription);
+router.put("/:id",  updateSubscription);
 
 // delete subscription
-router.delete("/:id",  protect, authorize('admin', 'student', 'staff', 'alumni'), deleteSubscription);
+router.delete("/:id", deleteSubscription);
 
 
 module.exports = router;

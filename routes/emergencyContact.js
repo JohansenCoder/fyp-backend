@@ -1,18 +1,20 @@
 const express = require("express");
 const router = express.Router();
-const { createEmergencyContact,getAllEmergencyContacts,updateEmergencyContact,deleteEmergencyContact } = require('../controllers/emergencyContactController');
-const { protect, authorize } = require('../middlewares/auth');
+const { createEmergencyContact,getEmergencyContacts,updateEmergencyContact,deleteEmergencyContact } = require('../controllers/emergencyContactController');
+const {authMiddleware, restrictToAdmin} = require('../middlewares/auth');
 
-// create emergency contact
-router.post('/', protect, authorize('admin'), createEmergencyContact)
 
-// get all Emergency contacts
-router.get('/', protect, authorize('admin', 'student', 'staff', 'alumni'), getAllEmergencyContacts)
+// create emergency contact (admin only)
+router.post('/', authMiddleware, restrictToAdmin, createEmergencyContact);
 
-// update an Emergency contact
-router.put('/:id', protect, authorize('admin'), updateEmergencyContact)
+// get emergency contacts
+router.get('/getEmergencyContacts', authMiddleware, getEmergencyContacts);
 
-// delete an emergency contact
-router.delete('/:id', protect, authorize('admin'), deleteEmergencyContact)
+
+// update an Emergency contact (admin only)
+ router.put('/:id', authMiddleware, restrictToAdmin, updateEmergencyContact);
+
+// delete an emergency contact (admin only)
+router.delete('/:id',authMiddleware, restrictToAdmin, deleteEmergencyContact)
 
 module.exports = router;

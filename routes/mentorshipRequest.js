@@ -4,10 +4,10 @@ const { createNewRequest, updateRequestStatus, deleteRequest} = require('../cont
 const { protect, authorize } = require('../middlewares/auth');
 
 // Route to create a new mentorship request
-router.post('/', protect, authorize('student'), createNewRequest);
+router.post('/',  createNewRequest);
 
 // Route to update the status of a mentorship request
-router.patch('/:requestId', protect, authorize('student', 'staff'), updateRequestStatus);
+router.patch('/:requestId', updateRequestStatus);
 
 // Route to delete a mentorship request     
-router.delete('/:id', protect, authorize('student'), deleteRequest);
+router.delete('/:id',  deleteRequest);

@@ -13,22 +13,27 @@ const errorHandler = require('./middlewares/errorHandler');
 const { authSecurity } = require("./middlewares/authSecurity");
 
 
+
 // config imports
 const passport = require("./config/passport");
 const connectDB = require("./config/db");
+// const { scheduleEventReminders } = require('./scheduler');
 
 // connect to MongoDB
 connectDB();
+
+// Start scheduler
+// scheduleEventReminders();
 
 // route imports
 const announcements = require("./routes/announcements");
 const users = require("./routes/users");
 const news = require("./routes/news");
-const subscription = require("./routes/subscription");
-const DynamicEvents = require("./routes/Dynamicevents");
+const events = require("./routes/events");
 const adminLogs = require("./routes/adminLogs");
 const emergencyContacts = require("./routes/emergencyContact")
 const authRoutes = require("./routes/AuthRoutes");
+const alumni = require("./routes/alumni");
 
 
 
@@ -41,6 +46,7 @@ app.use(logger);
 app.use(helmet());
 app.use(morgan('combined')); // Log all requests
 app.use(express.json());
+app.use('/uploads', express.static('uploads')); // Serve uploaded files
 
 
 
@@ -55,11 +61,11 @@ app.get("/", (req, res) => {
 app.use("/api/announcements", announcements)
 app.use("/api/users", users)
 app.use("/api/news", news)
-app.use("/api/subscriptions", subscription)
-app.use("/api/dynamicevents", DynamicEvents)
+app.use("/api/events", events)
 app.use("/api/adminLogs", adminLogs)
 app.use("/api/emergencyContacts", emergencyContacts)
 app.use("/api/authentication",authSecurity, authRoutes)
+app.use("/api/alumni", alumni)
 
 // Error handling
 app.use(errorHandler);

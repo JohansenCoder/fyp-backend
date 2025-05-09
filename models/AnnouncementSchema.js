@@ -3,13 +3,13 @@ const mongoose = require('mongoose');
 
 const AnnouncementSchema = new mongoose.Schema({
   title: { type: String, required: true },
-  message: { type: String, required: true },
+  content: { type: String, required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   targetRoles: [{
     type: String,
     enum: ['student', 'staff', 'alumni', 'visitor']
   }],
-  targetFaculties: [{ type: String }],
+  collegeScope: [{ type: String }],
   location: {
     coordinates: {
       type: [Number], // [longitude, latitude]
@@ -17,7 +17,7 @@ const AnnouncementSchema = new mongoose.Schema({
     },
     radius: { type: Number } // in meters
   },
-  type: {
+  category: {
     type: String,
     enum: ['emergency', 'academic', 'general', 'opportunity', 'event'],
     default: 'general'

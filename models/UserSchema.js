@@ -12,17 +12,28 @@ const userSchema = new mongoose.Schema({
         lastName: { type: String },
         department: { type: String }, // For students/staff
         graduationYear: { type: Number }, // For alumni
+        industry: { type: String }, // e.g., "Technology" (for alumni)
+        expertise: [{ type: String }], // e.g., ["AI", "Software Engineering"] (for alumni)
+        company: { type: String }, // e.g., "Google" (for alumni)
+        jobTitle: { type: String }, // e.g., "Senior Engineer" (for alumni)
+        mentorshipAvailability: { type: Boolean, default: false }, // For alumni
+        location: { type: String }, // e.g., "Dar es Salaam"
         phone: { type: String },
-        faculty: { type: String }, // For faculty-specific admins
+        bio: { type: String }, // Short biography
+        profilePicture: { type: String }, // URL to the profile picture
     },
     token: { type: String }, // Added token field
     interests: [String], // e.g., ["webinars", "hackathons"]
     notificationPreferences: {
         newEvents: { type: Boolean, default: true },
+        cancellations: { type: Boolean, default: true },
         reminders: { type: Boolean, default: true },
-        cancellations: { type: Boolean, default: true }
+        news: { type: Boolean, default: true },
+        announcements: { type: Boolean, default: true },
+        jobs: { type: Boolean, default: true }, 
+        mentorship: { type: Boolean, default: true } 
     },
-    fcmToken: { type: String }, // Firebase Cloud Messaging token
+    fcmTokens: [{ type: String }], // Multiple device support
     lastActive: { type: Date, default: Date.now }, // For session timeout
     createdAt: { type: Date, default: Date.now },
 });
