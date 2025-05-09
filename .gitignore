@@ -138,8 +138,5 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-#firebase
-.udsmconnect-firebase-adminsdk-fbsvc-4db6ac5006.json
-
-firebase/*.json
-.env
+# Firebase credentials
+firebase/udsmconnect-firebase-adminsdk-fbsvc-4db6ac5006.json
