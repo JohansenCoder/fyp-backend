@@ -1,10 +1,12 @@
 // controllers/eventsController.js
 const { parseAlmanac } = require('../services/almanacParser');
-const { notifyNewEvent, notifyCancellation } = require('../services/notificationService');
+const { notifyNewEvent, notifyCancellation, notifyAdminAction } = require('../services/notificationService');
 const AlmanacEvent = require('../models/AlmanacEventSchema');
 const DynamicEvent = require('../models/DynamicEventSchema');
+const Subscription = require('../models/SubscriptionSchema');
 const User = require('../models/UserSchema');
 const {validate} = require('../middlewares/validate');
+const {logAdminAction} = require('../utils/auditLog');
 
 // Upload and process almanac PDF
 exports.uploadAlmanac = async (req, res) => {
@@ -15,7 +17,7 @@ exports.uploadAlmanac = async (req, res) => {
         const { events, warnings } = await parseAlmanac(req.file.path);
         res.json({ message: 'Almanac processed', events, warnings });
     } catch (err) {
-        res.status(500).json({ error: `Processing error: ${err.message}` });
+        res.status(500).json({ error: `Almanac Upload error: ${err.message}` });
     }
 };
 
@@ -27,9 +29,9 @@ exports.getAlmanacEvents = async (req, res) => {
         if (college) query.college = college;
         if (eventType) query.eventType = eventType;
         const events = await AlmanacEvent.find(query);
-        res.json(events);
+        res.status(200).json(events);
     } catch (err) {
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Error fetching Almanac Events' });
     }
 };
 
@@ -63,6 +65,23 @@ exports.createDynamicEvent = async (req, res) => {
             });
             await event.save();
             await notifyNewEvent(event);
+
+            // log the event creation
+            const logId = await logAdminAction({
+                admin: req.user,
+                action: 'event_created',
+                targetResource: 'event',
+                targetId: event._id,
+                details: { title: event.title, college: event.college },
+                ipAddress: req.ip,
+            });
+            // notify admin about the event creation
+            await notifyAdminAction({
+                college: event.college,
+                message: `Event "${event.title}" created`,
+                actionType: 'Event Creation',
+                logId,
+            });
             res.status(201).json(event);
         } catch (error) {
             logger.error(`Create event error: ${error.message}`);
@@ -83,9 +102,9 @@ exports.getDynamicEvents = async (req, res) => {
             ]
         };
         const events = await DynamicEvent.find(query);
-        res.json(events);
+        res.status(200).json(events);
     } catch (err) {
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Failed to fetch Dynamic Events' });
     }
 };
 // Update a dynamic event
@@ -115,9 +134,26 @@ exports.updateDynamicEvent = async (req, res) => {
         }
         Object.assign(event, req.body);
         await event.save();
-        res.json(event);
+        // log the event update
+        const logId = await logAdminAction({
+            admin: req.user,
+            action: 'event_updated',
+            targetResource: 'event',
+            targetId: event._id,
+            details: { title: event.title, updates: req.body },
+            ipAddress: req.ip,
+        });
+        // notify admin about the event update
+        await notifyAdminAction({
+            college: event.college,
+            message: `Event "${event.title}" updated`,
+            actionType: 'Event Update',
+            logId,
+        });
+
+        res.status(200).json(event);
     } catch (err) {
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ error: 'Failed to Update Event' });
     }
 };
 // Cancel a dynamic event
@@ -130,8 +166,25 @@ exports.cancelDynamicEvent = async (req, res) => {
         }
         event.status = 'cancelled';
         await event.save();
-        await notifyCancellation(event);
         await event.remove();
+        await notifyCancellation(event);
+        // log the event cancellation
+        const logId = await logAdminAction({
+            admin: req.user,
+            action: 'event_cancelled',
+            targetResource: 'event',
+            targetId: req.params.id,
+            details: { title: event.title },
+            ipAddress: req.ip,
+        });
+        // notify admin about the event cancellation
+        await notifyAdminAction({
+            college: event.college,
+            message: `Event "${event.title}" canceled`,
+            actionType: 'Event cancellation',
+            logId,
+        });
+
         res.json({ message: 'Event cancelled successfully' });
         res.json(event);
     } catch (err) {
@@ -147,16 +200,35 @@ exports.registerForEvent = [
             const event = await DynamicEvent.findById(req.params.id);
             if (!event) return res.status(404).json({ message: 'Event not found' });
             if (event.status !== 'active') return res.status(400).json({ message: 'Event is not active' });
-            if (event.maxAttendees && event.attendees.length >= event.maxAttendees) {
-                return res.status(400).json({ message: 'Event is full' });
-            }
-            if (event.attendees.includes(req.user.id)) {
-                return res.status(400).json({ message: 'Already registered' });
+
+            // check max attendees
+            if (event.maxAttendees) {
+                const attendeeCount = await Subscription.countDocuments({
+                    event: event._id,
+                    status: 'active',
+                });
+                if (attendeeCount >= event.maxAttendees) {
+                    return res.status(400).json({ message: 'Event is full' });
+                }
             }
 
-            event.attendees.push(req.user.id);
-            await event.save();
+           // Check if already registered
+           const existingRegistration = await Subscription.findOne({
+            user: req.user._id,
+            event: event._id,
+            status: 'active',
+           });
+           if (existingRegistration) {
+            return res.status(400).json({ message: 'Already registered' });
+         }
 
+            // Create registration
+            const registration = new Subscription({
+                user: req.user._id,
+                event: event._id,
+            });
+            await registration.save();
+            // send notification
             const user = await User.findById(req.user.id).select('fcmTokens');
             if (user.fcmTokens?.length) {
                 await require('../services/notifications').sendPushNotification({
@@ -176,22 +248,31 @@ exports.registerForEvent = [
 ];
 
 // unregister from an event
-exports.unregisterFromEvent = [
+exports.unregisterFromEvent = 
     async (req, res) => {
         try {
             const event = await DynamicEvent.findById(req.params.id);
             if (!event) return res.status(404).json({ message: 'Event not found' });
-            if (!event.attendees.includes(req.user.id)) {
+
+            // Check if registered
+            const registration = await Subscription.findOne({
+                user: req.user._id,
+                event: event._id,
+                status: 'active',
+            });
+            if (!registration) {
                 return res.status(400).json({ message: 'Not registered' });
             }
-            event.attendees = event.attendees.filter(id => id.toString() !== req.user.id);
-            await event.save();
+           
+            // update the status to unsubscribed
+            registration.status = 'unsubscribed';
+            await registration.save();
+
             res.json({ message: 'Unregistered successfully' });
         } catch (error) {
             logger.error(`Unregister event error: ${error.message}`);
             res.status(500).json({ message: 'Failed to unregister' });
         }
-    },
-];
+    };
 
 

@@ -5,8 +5,10 @@ const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, trim: true },
     email: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true }, // Hashed
-    role: { type: String, enum: ['student', 'staff', 'alumni', 'admin'], required: true },
-    college: { type: String, required: true }, // e.g., "CoICT", "MCHAS"
+    role: { type: String, enum: ['student', 'staff', 'alumni', 'college_admin', 'system_admin'], required: true },
+    college: { type: String, required: function () {
+        return this.role === 'college_admin' || this.role === 'student';
+    }, }, // e.g., "CoICT", "MCHAS"
     profile: {
         firstName: { type: String },
         lastName: { type: String },
@@ -31,7 +33,10 @@ const userSchema = new mongoose.Schema({
         news: { type: Boolean, default: true },
         announcements: { type: Boolean, default: true },
         jobs: { type: Boolean, default: true }, 
-        mentorship: { type: Boolean, default: true } 
+        mentorship: { type: Boolean, default: true },
+        stories: { type: Boolean, default: true },
+        posts: { type: Boolean, default: true },
+        adminActions: { type: Boolean, default: true }, // For admin notifications
     },
     fcmTokens: [{ type: String }], // Multiple device support
     lastActive: { type: Date, default: Date.now }, // For session timeout

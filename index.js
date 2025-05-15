@@ -30,10 +30,11 @@ const announcements = require("./routes/announcements");
 const users = require("./routes/users");
 const news = require("./routes/news");
 const events = require("./routes/events");
-const adminLogs = require("./routes/adminLogs");
+const adminLogs = require("./routes/auditLogs");
 const emergencyContacts = require("./routes/emergencyContact")
 const authRoutes = require("./routes/AuthRoutes");
 const alumni = require("./routes/alumni");
+const feed = require('./routes/feed');
 
 
 
@@ -66,6 +67,7 @@ app.use("/api/adminLogs", adminLogs)
 app.use("/api/emergencyContacts", emergencyContacts)
 app.use("/api/authentication",authSecurity, authRoutes)
 app.use("/api/alumni", alumni)
+app.use("/api/feed", feed)
 
 // Error handling
 app.use(errorHandler);

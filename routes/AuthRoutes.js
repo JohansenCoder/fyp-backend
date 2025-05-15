@@ -9,6 +9,8 @@ const { authSecurity } = require('../middlewares/authSecurity');
 const router = express.Router();
 
 // Public routes
+
+// allow a user to register
 router.post(
     '/register',
     validate([
@@ -45,6 +47,7 @@ router.post(
     authController.register
 );
 
+// allow a user to login
 router.post(
     '/login',
     validate([
@@ -64,6 +67,8 @@ router.post(
     authController.login
 );
 
+// allow a user to forget password
+// send a reset password link to the user's email
 router.post(
     '/forgot-password',
     validate([body('email').isEmail().normalizeEmail()]),
@@ -71,6 +76,7 @@ router.post(
     authController.forgotPassword
 );
 
+// allow a user to reset password
 router.post(
     '/reset-password',
     validate([
@@ -80,7 +86,7 @@ router.post(
     authController.resetPassword
 );
 
-// Protected routes
+// Protected routes, allows a user to logout
 router.post(
     '/logout',
     passport.authenticate('jwt', { session: false }),

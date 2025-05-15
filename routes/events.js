@@ -1,13 +1,13 @@
 // routes/events.js
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, restrictToAdmin, restrictToOrganizer } = require('../middlewares/auth');
+const { authMiddleware, restrictToSystemAdmin, restrictToOrganizer } = require('../middlewares/auth');
 const upload = require('../middlewares/upload');
 const { uploadAlmanac,getAlmanacEvents,createDynamicEvent,getDynamicEvents,updateDynamicEvent,cancelDynamicEvent,registerForEvent,unregisterFromEvent} = require('../controllers/eventController');
 const { registerDeviceToken, updateFcmToken } = require('../controllers/notificationController');
 
 // Upload almanac PDF (admin only)
-router.post('/almanac/upload', authMiddleware, restrictToAdmin, upload.single('almanac'), uploadAlmanac);
+router.post('/almanac/upload', authMiddleware, restrictToSystemAdmin, upload.single('almanac'), uploadAlmanac);
 
 // Get almanac events (public for authenticated users)
 router.get('/almanac', authMiddleware, getAlmanacEvents);

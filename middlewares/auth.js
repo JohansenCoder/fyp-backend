@@ -16,18 +16,32 @@ exports.authMiddleware = (req, res, next) => {
     }
 };
 
+// Restrict to system admin
+exports.restrictToSystemAdmin = (req, res, next) => {
+    if (req.user.role !== 'system_admin') {
+        return res.status(403).json({ error: 'System Admin access required' });
+    }
+    next();
+};
+
 // Restrict to admins
 exports.restrictToAdmin = (req, res, next) => {
-    if (req.user.role !== 'admin') {
+    if (!['system_admin', 'college_admin'].includes(req.user.role)) {
         return res.status(403).json({ error: 'Admin access required' });
+    }
+    if (req.user.role === 'college_admin' && req.user.college !== req.params.college) {
+        return res.status(403).json({ error: 'You can only manage your own college' });
     }
     next();
 };
 
 // Restrict to organizers or admins
 exports.restrictToOrganizer = (req, res, next) => {
-    if (!['organizer', 'admin'].includes(req.user.role)) {
+    if (!['organizer', 'system_admin', 'college_admin'].includes(req.user.role)) {
         return res.status(403).json({ error: 'Organizer or admin access required' });
+    }
+    if (req.user.role === 'college_admin' && req.user.college !== req.params.college) {
+        return res.status(403).json({ error: 'You can only manage your own college' });
     }
     next();
 };
@@ -46,3 +60,4 @@ exports.restrictToStudent = (req, res, next) => {
     }
     next();
 };
+

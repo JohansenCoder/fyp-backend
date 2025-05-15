@@ -3,10 +3,10 @@ const mentorshipRequest = require("../models/MentorshipRequestSchema")
 exports.createNewRequest = async (req, res)=>{
  
     try{
-        const mentorshipRequest = await mentorshipRequest.create(req.body);
+        const request = await mentorshipRequest.create(req.body);
         return res.status(201).json({
             message: "Mentorship request created successfully",
-            mentorshipRequest: mentorshipRequest
+            mentorshipRequest: request
         });
     }
     catch(err){
@@ -15,6 +15,18 @@ exports.createNewRequest = async (req, res)=>{
     
 }
 
+// get all mentorship request
+exports.getAllMentorshipRequests = async (req, res) => {
+    try {
+        const requests = await mentorshipRequest.find();
+        return res.status(200).json({
+            message: "Mentorship requests retrieved successfully",
+            data: requests
+        });
+    } catch (err) {
+        return res.status(500).json({ message: "Error retrieving mentorship requests", error: err.message });
+    }
+};
 
 exports.updateRequestStatus = async (req, res) => {
     try {
@@ -27,7 +39,7 @@ exports.updateRequestStatus = async (req, res) => {
       }
   
       // Find the request
-      const request = await MentorshipRequest.findById(requestId);
+      const request = await mentorshipRequest.findById(requestId);
   
       // Check if it exists
       if (!request) {

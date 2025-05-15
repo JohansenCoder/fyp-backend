@@ -1,21 +1,21 @@
 const express = require('express');
 const passport = require('passport');
-const { checkRole } = require('../middlewares/rbac');
 const { getAllUsers, getUserById, createUser, updateUser, deleteUser, getProfile, updateProfile } = require("../controllers/userController");
 const validate = require('../middlewares/validate');
 const { body } = require('express-validator');
+const {restrictToAdmin} = require('../middlewares/auth')
 
 const router = express.Router();
 
 // Protected routes (all users)
 router.get(
-    '/profile',
+    '/profile/:id',
     passport.authenticate('jwt', { session: false }),
     getProfile
 );
 
 router.put(
-    '/profile',
+    '/profile/:id',
     passport.authenticate('jwt', { session: false }),
     validate([
         body('profile.firstName').optional().trim(),
@@ -31,28 +31,28 @@ router.put(
 router.post(
     '/',
     passport.authenticate('jwt', { session: false }),
-    checkRole(['admin']),
+    restrictToAdmin,
     createUser
 )
 
 router.get(
     '/',
     passport.authenticate('jwt', { session: false }),
-    checkRole(['admin']),
+    restrictToAdmin,
     getAllUsers
 );
 
 router.get(
     '/:id',
     passport.authenticate('jwt', { session: false }),
-    checkRole(['admin']),
+    restrictToAdmin,
     getUserById
 )
 
 router.put(
     '/:id',
     passport.authenticate('jwt', { session: false }),
-    checkRole(['admin']),
+   restrictToAdmin,
     validate([
         body('role').optional().isIn(['student', 'staff', 'alumni', 'admin']),
         body('profile.department').optional().trim(),
@@ -64,7 +64,7 @@ router.put(
 router.delete(
     '/:id',
     passport.authenticate('jwt', { session: false }),
-    checkRole(['admin']),
+    restrictToAdmin,
     deleteUser
 );
 

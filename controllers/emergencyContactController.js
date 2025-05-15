@@ -1,4 +1,7 @@
 const EmergencyContact = require('../models/EmergencyContactSchema');
+const {logAdminAction} = require('../utils/auditLog');
+const {notifyAdminAction} = require('../services/notificationService');
+const {validate} = require('../middlewares/validate')
 
 // create emergency contact (admin only)
 exports.createEmergencyContact = async (req, res) => {
@@ -23,6 +26,24 @@ exports.createEmergencyContact = async (req, res) => {
         updatedAt: new Date(),
     });
     await emergencyContact.save();
+
+     // Log the action
+     const logId = await logAdminAction({
+        admin: req.user,
+        action: 'Emergency Contact created',
+        targetResource: 'Emergency Contact',
+        targetId: emergencyContact._id,
+        details: { title: emergencyContact.title, updates: req.body },
+        ipAddress: req.ip,
+    });
+
+    await notifyAdminAction({
+        college: emergencyContact.college,
+        message: `Emergency Contact "${emergencyContact.title}" created`,
+        actionType: 'Emergency Contact Created',
+        logId,
+    });
+
     res.status(201).json({
       message: "Emergency contact created successfully",
       emergencyContact: emergencyContact
@@ -78,6 +99,7 @@ exports.updateEmergencyContact = async (req, res) => {
         body('updatedAt').optional().isISO8601().toDate()
       ]).run(req);
 
+   try {
     const { id } = req.params;
     const emergencyContact = await EmergencyContact.findById(id);
     if (!emergencyContact) {
@@ -87,14 +109,41 @@ exports.updateEmergencyContact = async (req, res) => {
     }   
     Object.assign(contact, req.body, { updatedBy: req.user.id, updatedAt: new Date() });
     await emergencyContact.save();
+     
+    // Log the action
+    const logId = await logAdminAction({
+        admin: req.user,
+        action: 'Emergency Contact updated',
+        targetResource: 'Emergency Contact',
+        targetId: emergencyContact._id,
+        details: { title: emergencyContact.title, updates: req.body },
+        ipAddress: req.ip,
+    });
+
+    await notifyAdminAction({
+        college: emergencyContact.college,
+        message: `Emergency Contact "${emergencyContact.title}" updated`,
+        actionType: 'Emergency Contact Updated',
+        logId,
+    });
+
+
     res.status(200).json({
         message: "Emergency contact updated successfully",
         emergencyContact: emergencyContact
     });
+   }
+    catch (err) {
+     res.status(500).json({
+          message: "Error updating emergency contact",
+          error: err
+     });
+    }
 }
 
 exports.deleteEmergencyContact = async (req, res) => {
-    const { id } = req.params;
+    try{
+        const { id } = req.params;
     const emergencyContact = await EmergencyContact.findById(id);
     if (!emergencyContact) {
         res.status(404).json({
@@ -102,10 +151,33 @@ exports.deleteEmergencyContact = async (req, res) => {
         });
     }   
     await EmergencyContact.findByIdAndDelete(id);
+
+     // Log the action
+     const logId = await logAdminAction({
+        admin: req.user,
+        action: 'Emergency Contact deleted',
+        targetResource: 'Emergency Contact',
+        targetId: emergencyContact._id,
+        details: { title: emergencyContact.title, updates: req.body },
+        ipAddress: req.ip,
+    });
+
+    await notifyAdminAction({
+        college: emergencyContact.college,
+        message: `Emergency Contact "${emergencyContact.title}" deleted`,
+        actionType: 'Emergency Contact Deleted',
+        logId,
+    });
+    
     res.status(200).json({
         message: "Emergency contact deleted successfully",
         emergencyContact: emergencyContact
     });
-
-
+    }
+    catch (err) {
+        res.status(500).json({
+            message: "Error deleting emergency contact",
+            error: err
+        });
+    }
 }

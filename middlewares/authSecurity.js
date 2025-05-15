@@ -68,7 +68,7 @@ const trackSuspiciousActivity = async (req, res, next) => {
     }
 };
 
-// Combined middleware
+// Combined middleware (authentication security)
 const authSecurity = (req, res, next) => {
     // Apply rate limiter first
     rateLimiter(req, res, (rateLimitError) => {

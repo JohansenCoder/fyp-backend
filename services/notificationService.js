@@ -248,5 +248,73 @@ exports.notifyMentorshipStatus = async (mentorship, status) => {
     }
 };
 
+// Notify new story
+exports.notifyNewStory = async (story) => {
+    const query = { 'notificationPreferences.stories': true };
+    if (story.college) query.college = story.college;
+
+    const users = await User.find(query).select('fcmTokens');
+    const tokens = users.flatMap(user => user.fcmTokens || []).filter(Boolean);
+
+    if (tokens.length) {
+        await exports.sendPushNotification({
+            tokens,
+            title: `New Story from ${story.college}`,
+            body: `Check out the latest story from your college!`,
+            data: { storyId: story._id.toString(), type: 'story' },
+        });
+        logger.info(`Notified ${tokens.length} users about story from ${story.college}`);
+    } else {
+        logger.info(`No users to notify for story from ${story.college}`);
+    }
+};
+
+// Notify new post
+exports.notifyNewPost = async (post) => {
+    const query = { 'notificationPreferences.posts': true };
+    if (post.college) query.college = post.college;
+    if (post.targetRoles?.length) query.role = { $in: post.targetRoles };
+    if (post.tags?.length) query.interests = { $in: post.tags };
+
+    const users = await User.find(query).select('fcmTokens');
+    const tokens = users.flatMap(user => user.fcmTokens || []).filter(Boolean);
+
+    if (tokens.length) {
+        await exports.sendPushNotification({
+            tokens,
+            title: `New Post: ${post.title}`,
+            body: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
+            data: { postId: post._id.toString(), type: 'post' },
+        });
+        logger.info(`Notified ${tokens.length} users about post: ${post.title}`);
+    } else {
+        logger.info(`No users to notify for post: ${post.title}`);
+    }
+};
+
+// Notify admin action
+exports.notifyAdminAction = async ({ college, message, actionType, logId }) => {
+    const query = {
+        'notificationPreferences.adminActions': true,
+        role: { $in: ['college_admin', 'system_admin'] },
+    };
+    if (college) query.college = college;
+
+    const users = await User.find(query).select('fcmTokens');
+    const tokens = users.flatMap(user => user.fcmTokens || []).filter(Boolean);
+
+    if (tokens.length) {
+        await exports.sendPushNotification({
+            tokens,
+            title: `Admin Action: ${actionType}`,
+            body: message,
+            data: { type: 'admin_action', college, logId: logId?.toString() },
+        });
+        logger.info(`Notified ${tokens.length} admins about action: ${actionType}`);
+    } else {
+        logger.info(`No admins to notify for action: ${actionType}`);
+    }
+};
+
 // Start reminder scheduler
 exports.scheduleEventReminders();

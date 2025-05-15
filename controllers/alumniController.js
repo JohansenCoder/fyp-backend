@@ -4,7 +4,7 @@ const JobOpportunity = require('../models/JobOpportunitySchema');
 const Connection = require('../models/ConnectionSchema');
 const Mentorship = require('../models/MentorshipRequestSchema');
 const Message = require('../models/MessageSchema');
-const { notifyJobOpportunity, notifyMentorshipRequest, notifyMentorshipStatus } = require('../services/notificationService');
+const { notifyJobOpportunity, notifyMentorshipRequest, notifyMentorshipStatus, notifyAdminAction } = require('../services/notificationService');
 const winston = require('winston');
 const {validate} = require('../middlewares/validate');
 
@@ -13,16 +13,19 @@ const logger = winston.createLogger({
 });
 
 // This function updates the alumni profile with the provided data
-exports.updateAlumniProfile = [
-    body('profile.graduationYear').optional().isInt({ min: 1960, max: new Date().getFullYear() }),
-    body('profile.industry').optional().trim(),
-    body('profile.expertise').optional().isArray(),
-    body('profile.company').optional().trim(),
-    body('profile.jobTitle').optional().trim(),
-    body('profile.mentorshipAvailability').optional().isBoolean(),
-    body('profile.bio').optional().trim(),
-    body('profile.linkedIn').optional().isURL(),
+exports.updateAlumniProfile = 
     async (req, res) => {
+        // validating the request body
+    validate([
+        body('profile.graduationYear').optional().isInt({ min: 1960, max: new Date().getFullYear() }),
+        body('profile.industry').optional().trim(),
+        body('profile.expertise').optional().isArray(),
+        body('profile.company').optional().trim(),
+        body('profile.jobTitle').optional().trim(),
+        body('profile.mentorshipAvailability').optional().isBoolean(),
+        body('profile.bio').optional().trim(),
+        body('profile.linkedIn').optional().isURL(),
+    ])
         try {
             const user = await User.findById(req.user.id);
             if (user.role !== 'alumni') return res.status(403).json({ message: 'Not an alumni' });
@@ -34,8 +37,8 @@ exports.updateAlumniProfile = [
             logger.error(`Update alumni profile error: ${error.message}`);
             res.status(500).json({ message: 'Failed to update profile' });
         }
-    },
-];
+    }
+;
 
 // This function helps search for alumni based on various criteria
 // It allows searching by college, department, graduation year, industry, and expertise
@@ -145,17 +148,20 @@ exports.getConnections = async (req, res) => {
     }
 };
 
-// This function creates a job opportunity
+// This function creates a job opportunity by an admin
 // It validates the input data and saves the job opportunity to the database
-exports.createJobOpportunity = [
-    body('title').notEmpty().trim(),
-    body('description').notEmpty().trim(),
-    body('college').optional().trim(),
-    body('department').optional().trim(),
-    body('tags').optional().isArray(),
-    body('applicationLink').optional().trim().isURL(),
-    body('deadline').optional().isISO8601(),
-    async (req, res) => {
+exports.createJobOpportunity = 
+        async (req, res) => {
+            // validating the request body
+    validate([
+        body('title').notEmpty().trim(),
+        body('description').notEmpty().trim(),
+        body('college').optional().trim(),
+        body('department').optional().trim(),
+        body('tags').optional().isArray(),
+        body('applicationLink').optional().trim().isURL(),
+        body('deadline').optional().isISO8601()
+    ])
         try {
             const job = new JobOpportunity({
                 ...req.body,
@@ -163,13 +169,29 @@ exports.createJobOpportunity = [
             });
             await job.save();
             await notifyJobOpportunity(job);
+            // Log the action
+            const logId = await logAdminAction({
+                admin: req.user,
+                action: 'job opportunity created',
+                targetResource: 'JobOpportunity',
+                targetId: job._id,
+                details: { title: job.title, updates: req.body },
+                ipAddress: req.ip,
+            });
+        
+            await notifyAdminAction({
+                college: job.college,
+                message: `Job Opportunity "${job.title}" created`,
+                actionType: 'Job Opportunity Created',
+                logId,
+            });
             res.status(201).json(job);
         } catch (error) {
             logger.error(`Create job opportunity error: ${error.message}`);
             res.status(500).json({ message: 'Failed to create job opportunity' });
         }
-    },
-];
+    }
+;
 
 // This function fetches job opportunities based on college and department
 // It retrieves all job opportunities that are still open (deadline not passed)

@@ -2,7 +2,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const User = require('../models/UserSchema');
-const AuditLog = require('../models/AuditLog');
+const AuditLog = require('../models/AuditLogSchema');
 const sanitize = require('mongo-sanitize');
 const { sendEmail } = require('../services/emailService');
 const { handleFailedLogin, authSecurity } = require('../middlewares/authSecurity');
@@ -60,12 +60,7 @@ exports.register = async (req, res) => {
             { expiresIn: '15m' }
         );
 
-        // Log successful registration
-        await AuditLog.create({
-            action: 'user_registration',
-            performedBy: user._id,
-            details: `User ${username} registered with role ${role} and college ${college}`,
-        });
+       
 
         res.status(201).json({
             token,
@@ -94,7 +89,12 @@ exports.login = async (req, res) => {
             await AuditLog.create({
                 action: 'potential_nosql_injection',
                 performedBy: null,
+                role: null,
+                targetResource: 'login',
+                targetId: null,
                 details: `Invalid login input: ${JSON.stringify(req.body)}`,
+                ipAddress: req.ip,
+                timestamp: new Date(),
             });
             return res.status(400).json({ message: 'Username and password must be strings' });
         }
@@ -144,13 +144,6 @@ exports.login = async (req, res) => {
         user.lastActive = Date.now();
         await user.save();
 
-        // Log successful login
-        await AuditLog.create({
-            action: 'user_login',
-            performedBy: user._id,
-            details: `User ${username} logged in`,
-        });
-
         res.json({
             token,
             user: {
@@ -186,6 +179,11 @@ exports.forgotPassword = async (req, res) => {
         await AuditLog.create({
             action: 'password_reset_request',
             performedBy: user._id,
+            role: user.role,
+            targetResource: 'user',
+            targetId: user._id,
+            ipAddress: req.ip,
+            timestamp: new Date(),
             details: `Password reset requested for ${email}`,
         });
 
@@ -215,6 +213,11 @@ exports.resetPassword = async (req, res) => {
         await AuditLog.create({
             action: 'password_reset',
             performedBy: user._id,
+            role: user.role,
+            targetResource: 'user',
+            targetId: user._id,
+            ipAddress: req.ip,
+            timestamp: new Date(),
             details: `Password reset for ${user.username}`,
         });
 
@@ -228,10 +231,6 @@ exports.resetPassword = async (req, res) => {
 exports.logout = (req, res) => {
     // Client-side should discard token
     // Log logout
-    AuditLog.create({
-        action: 'user_logout',
-        performedBy: req.user ? req.user.id : null,
-        details: `User logged out`,
-    });
+   
     res.json({ message: 'Logged out successfully' });
 };

@@ -14,6 +14,8 @@ const SubscriptionSchema = new mongoose.Schema({
     default: 'subscribed'
   }
 });
+// unique index to prevent duplicate subscriptions
+SubscriptionSchema.index({ userId: 1, eventId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Subscription', SubscriptionSchema);
 
