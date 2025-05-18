@@ -7,15 +7,26 @@ const sanitize = require('mongo-sanitize');
 const { sendEmail } = require('../services/emailService');
 const { handleFailedLogin, authSecurity } = require('../middlewares/authSecurity');
 const winston = require('winston');
+const validate = require("../middlewares/validate")
 
 const logger = winston.createLogger({
     transports: [new winston.transports.Console()],
 });
 
 exports.register = async (req, res) => {
+    // validate request body
+    validate([
+        body('username').notEmpty().message('Username should not be empty').trim(),
+        body('email').notEmpty().isEmail().message('Invalid email format').trim(),
+        body('password').notEmpty().isLength({ min: 6 }).message('Password must be at least 6 characters long').trim(),
+        body('role').notEmpty().isIn(['visitor']).message('Role must be visitor').trim(),
+        body('profile').Optional().isObject().withMessage('Profile must be an object'),
+        body('profile.firstName').Optional().isString().withMessage('First name must be a string').trim(),
+        body('profile.lastName').Optional().isString().withMessage('Last name must be a string').trim(),
+    ])
     try {
         // Added 'college' to destructured fields
-        let { username, email, password, role, college, profile } = req.body;
+        let { username, email, password, role, profile } = req.body;
 
         // Sanitize inputs
         username = sanitize(username);
@@ -24,14 +35,8 @@ exports.register = async (req, res) => {
         if (profile) {
             profile.firstName = sanitize(profile.firstName);
             profile.lastName = sanitize(profile.lastName);
-            profile.department = sanitize(profile.department);
-            profile.faculty = sanitize(profile.faculty);
         }
 
-        // Validate required fields
-        if (!username || !email || !password || !role || !college) {
-            return res.status(400).json({ message: 'All required fields (username, email, password, role, college) must be provided' });
-        }
 
         // Check for existing user
         const existingUser = await User.findOne({ $or: [{ username }, { email }] });
@@ -48,7 +53,6 @@ exports.register = async (req, res) => {
             email,
             password: hashedPassword,
             role,
-            college, // Include college
             profile,
         });
         await user.save();
@@ -63,12 +67,12 @@ exports.register = async (req, res) => {
        
 
         res.status(201).json({
+            message: 'User registered successfully',
             token,
             user: {
                 id: user._id,
                 username: user.username,
                 role: user.role,
-                college: user.college, // Include college in response
                 profile: user.profile,
             },
         });
@@ -145,6 +149,7 @@ exports.login = async (req, res) => {
         await user.save();
 
         res.json({
+            message: 'Login successful',
             token,
             user: {
                 id: user._id,

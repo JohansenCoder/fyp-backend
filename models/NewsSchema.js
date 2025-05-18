@@ -7,7 +7,7 @@ const NewsSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   category: {
     type: String,
-    enum:['sports', 'technology', 'health', 'academics', 'alumni', 'students_life', 'external_partnerships'],
+    enum:['sports', 'technology', 'health', 'academics', 'alumni', 'students life', 'Career fair'],
     required: true
   },
   attachments: [{
@@ -16,7 +16,7 @@ const NewsSchema = new mongoose.Schema({
   tags: [{ type: String }],
   targetRoles: [{
     type: String,
-    enum: ['student', 'staff', 'alumni']
+    enum: ['student', 'visitor', 'alumni']
   }],
   collegeScope: [{ type: String }],
   isPublished: { type: Boolean, default: true },

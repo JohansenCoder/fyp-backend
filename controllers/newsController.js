@@ -41,7 +41,7 @@ exports.createNews = async (req, res) => {
             logId,
         });
         return res.status(201).json({
-            message: "News created successfully",
+            message: "News article created successfully",
             news: news
         });
     } catch (err) {

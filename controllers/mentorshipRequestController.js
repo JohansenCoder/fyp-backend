@@ -19,6 +19,7 @@ exports.createNewRequest = async (req, res)=>{
 exports.getAllMentorshipRequests = async (req, res) => {
     try {
         const requests = await mentorshipRequest.find();
+        if(!requests) return res.status(404).json({message:"You don't have any Mentorship requests currently."})
         return res.status(200).json({
             message: "Mentorship requests retrieved successfully",
             data: requests

@@ -58,6 +58,8 @@ exports.createAnnouncement = async (req, res) => {
 exports.getAllAnnouncements = async (req, res) => {
     try {
         const user = await User.findById(req.user.userId);
+
+        if(!user) return res.status(404).json({ message: "User not Found."})
         const query = {
             isPublished: true,
             $or: [

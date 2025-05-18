@@ -6,7 +6,9 @@ const { notifyAdminAction } = require('../services/notificationService');
 
 exports.getProfile = async (req, res) => {
     try {
-        const user = await User.findById(req.params.id).select('-password');
+        const user = await User.findById(req.params.id);
+        if(!user) return res.status(404).json({ message: 'User not found' });
+
         res.json(user);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch profile', error: error.message });
@@ -17,6 +19,8 @@ exports.updateProfile = async (req, res) => {
     try {
         const { profile } = req.body;
         const user = await User.findById(req.params.id);
+
+        if(!user) return res.status(404).json({ message: 'User not found' });
 
         user.profile = {
             ...user.profile,
@@ -70,6 +74,8 @@ exports.getAllUsers = async (req, res) => {
     try {
         const users = await User.find();
 
+        if(!users) return res.status(404).json({message:"No Users Found!!"})
+
         await logAdminAction({
             admin: req.user,
             action: 'view_users',
@@ -118,7 +124,14 @@ exports.updateUser = async (req, res) => {
                 department: profile.department || user.profile.department,
                 graduationYear: profile.graduationYear || user.profile.graduationYear,
                 phone: profile.phone || user.profile.phone,
-                faculty: profile.faculty || user.profile.faculty,
+                college: profile.college || user.profile.college,
+                location: profile.location || user.profile.location,
+                bio: profile.bio || user.profile.bio,
+                profilePicture: profile.profilePicture || user.profile.profilePicture,
+                industry: profile.industry || user.profile.industry,
+                expertise: profile.expertise || user.profile.expertise,
+                company: profile.company || user.profile.company,
+                jobTitle: profile.jobTitle || user.profile.jobTitle,
             };
         }
 

@@ -12,7 +12,7 @@ router.get('/', authMiddleware, getFeed);
 router.post('/stories', authMiddleware, restrictToAdmin, createStory);
 
 // Create post (admins only)
-router.post('/posts', authMiddleware, restrictToAdmin, createPost);
+router.post('/posts', authMiddleware, createPost);
 // React to post 
 router.post('/posts/react/:id', authMiddleware, reactToPost);
 // Comment on post

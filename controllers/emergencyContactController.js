@@ -10,11 +10,9 @@ exports.createEmergencyContact = async (req, res) => {
     body('name').notEmpty().withMessage('Name is required'),
     body('phone').notEmpty().withMessage('Phone number is required').matches(/^\+255\d{9}$/),
     body('category').notEmpty().withMessage('Category is required'),
-    body('description').optional().isString(),
-    body('location').optional().isString(),
+    body('description').notEmpty().isString(),
+    body('location').notEmpty().isString(),
     body('priority').optional().isInt({ min: 1 }).withMessage('Priority must be a positive integer'),
-    body('visibleTo').optional().isArray().withMessage('VisibleTo must be an array'),
-    body('visibleTo.*').isIn(['student', 'staff', 'alumni', 'visitor']).withMessage('Invalid value in visibleTo array'),
     body('createdAt').optional().isISO8601().toDate(),
     body('updatedAt').optional().isISO8601().toDate()
   ]).run(req);
@@ -59,13 +57,10 @@ exports.createEmergencyContact = async (req, res) => {
 // get  emergency contacts
 exports.getEmergencyContacts = async (req, res) => {
     try{
-        const {category, visibleTo,college} = req.query;
+        const {category,college} = req.query;
         const query = {};
         if (category) {
             query.category = category;
-        }
-        if (visibleTo) {
-            query.visibleTo = { $in: visibleTo };
         }
         if (college) {
             query.college = college;
@@ -92,11 +87,7 @@ exports.updateEmergencyContact = async (req, res) => {
         body('category').optional().notEmpty().withMessage('Category is required'),
         body('description').optional().isString(),
         body('location').optional().isString(),
-        body('priority').optional().isInt({ min: 1 }).withMessage('Priority must be a positive integer'),
-        body('visibleTo').optional().isArray().withMessage('VisibleTo must be an array'),
-        body('visibleTo.*').isIn(['student', 'staff', 'alumni', 'visitor']).withMessage('Invalid value in visibleTo array'),
-        body('createdAt').optional().isISO8601().toDate(),
-        body('updatedAt').optional().isISO8601().toDate()
+        body('priority').optional().isInt({ min: 1 }).withMessage('Priority must be a positive integer')
       ]).run(req);
 
    try {

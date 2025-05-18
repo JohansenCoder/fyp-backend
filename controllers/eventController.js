@@ -3,7 +3,7 @@ const { parseAlmanac } = require('../services/almanacParser');
 const { notifyNewEvent, notifyCancellation, notifyAdminAction } = require('../services/notificationService');
 const AlmanacEvent = require('../models/AlmanacEventSchema');
 const DynamicEvent = require('../models/DynamicEventSchema');
-const Subscription = require('../models/SubscriptionSchema');
+const Registration = require('../models/RegistrationSchema');
 const User = require('../models/UserSchema');
 const {validate} = require('../middlewares/validate');
 const {logAdminAction} = require('../utils/auditLog');
@@ -43,26 +43,22 @@ exports.createDynamicEvent = async (req, res) => {
     validate([
         body('title').notEmpty().trim(),
         body('description').notEmpty().trim(),
-        body('category').isIn(['workshop', 'seminar', 'conference', 'webinar']),
-        body('imageUrl').optional().isURL(),
-        body('attendees').optional().isArray(),
-        body('maxAttendees').optional().isInt({ min: 1 }),
+        body('category').notEmpty().trim(),
+        body('imageUrl').notEmpty().isURL(),
+        body('maxAttendees').notEmpty().isInt({ min: 1 }),
         body('registrationLink').optional().isURL(),
         body('startDate').isISO8601(),
         body('endDate').isISO8601(),
         body('college').optional().isArray(),
         body('department').optional().isArray(),
         body('tags').optional().isArray(),
-        body('organizer').optional().isString(),
-        body('location').optional().isString(),
-        body('status').optional().isIn(['active', 'cancelled'])
+        body('organizer').notEmpty().isString(),
+        body('location').notEmpty().isString(),
+        body('status').notEmpty().isIn(['active', 'cancelled'])
     ]),
     async (req, res) => {
         try {
-            const event = new DynamicEvent({
-                ...req.body,
-                organizer: req.user.id,
-            });
+            const event = new DynamicEvent(req.body);
             await event.save();
             await notifyNewEvent(event);
 
@@ -94,6 +90,8 @@ exports.createDynamicEvent = async (req, res) => {
 exports.getDynamicEvents = async (req, res) => {
     try {
         const user = await User.findById(req.user.userId);
+
+        if(!user) return res.status(404).json({message : "User not found"});
         const query = {
             status: 'active',
             $or: [
@@ -115,7 +113,6 @@ exports.updateDynamicEvent = async (req, res) => {
         body('description').optional().notEmpty().trim(),
         body('category').optional().isIn(['workshop', 'seminar', 'conference', 'webinar']),
         body('imageUrl').optional().isURL(),
-        body('attendees').optional().isArray(),
         body('maxAttendees').optional().isInt({ min: 1 }),
         body('registrationLink').optional().isURL(),
         body('startDate').optional().isISO8601(),
@@ -129,7 +126,7 @@ exports.updateDynamicEvent = async (req, res) => {
     try {
         const event = await DynamicEvent.findById(req.params.id);
         if (!event) return res.status(404).json({ error: 'Event not found' });
-        if (event.organizer.toString() !== req.user.userId) {
+        if (event.createdBy.toString() !== req.user.userId) {
             return res.status(403).json({ error: 'Not authorized' });
         }
         Object.assign(event, req.body);
@@ -161,7 +158,7 @@ exports.cancelDynamicEvent = async (req, res) => {
     try {
         const event = await DynamicEvent.findById(req.params.id);
         if (!event) return res.status(404).json({ error: 'Event not found' });
-        if (event.organizer.toString() !== req.user.userId) {
+        if (event.createdBy.toString() !== req.user.userId) {
             return res.status(403).json({ error: 'Not authorized' });
         }
         event.status = 'cancelled';
@@ -203,9 +200,9 @@ exports.registerForEvent = [
 
             // check max attendees
             if (event.maxAttendees) {
-                const attendeeCount = await Subscription.countDocuments({
+                const attendeeCount = await Registration.countDocuments({
                     event: event._id,
-                    status: 'active',
+                    status: 'registered',
                 });
                 if (attendeeCount >= event.maxAttendees) {
                     return res.status(400).json({ message: 'Event is full' });
@@ -213,7 +210,7 @@ exports.registerForEvent = [
             }
 
            // Check if already registered
-           const existingRegistration = await Subscription.findOne({
+           const existingRegistration = await Registration.findOne({
             user: req.user._id,
             event: event._id,
             status: 'active',
@@ -223,7 +220,7 @@ exports.registerForEvent = [
          }
 
             // Create registration
-            const registration = new Subscription({
+            const registration = new Registration({
                 user: req.user._id,
                 event: event._id,
             });
@@ -255,7 +252,7 @@ exports.unregisterFromEvent =
             if (!event) return res.status(404).json({ message: 'Event not found' });
 
             // Check if registered
-            const registration = await Subscription.findOne({
+            const registration = await Registration.findOne({
                 user: req.user._id,
                 event: event._id,
                 status: 'active',
@@ -264,8 +261,8 @@ exports.unregisterFromEvent =
                 return res.status(400).json({ message: 'Not registered' });
             }
            
-            // update the status to unsubscribed
-            registration.status = 'unsubscribed';
+            // update the status to unregistered
+            registration.status = 'unregistered';
             await registration.save();
 
             res.json({ message: 'Unregistered successfully' });

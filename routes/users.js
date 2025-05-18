@@ -54,9 +54,14 @@ router.put(
     passport.authenticate('jwt', { session: false }),
    restrictToAdmin,
     validate([
-        body('role').optional().isIn(['student', 'staff', 'alumni', 'admin']),
+        body('role').optional().isIn(['student', 'visitor', 'alumni']),
+        body('profile.firstName').optional().trim(),
+        body('profile.lastName').optional().trim(),
         body('profile.department').optional().trim(),
-        body('profile.faculty').optional().trim(),
+        body('profile.location').optional().trim(),
+        body('profile.phone').optional().trim(),
+        body('profile.bio').optional().trim(),
+        body('profile.profilePicture').optional().trim(),
     ]),
     updateUser
 );

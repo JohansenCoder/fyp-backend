@@ -27,7 +27,9 @@ exports.updateAlumniProfile =
         body('profile.linkedIn').optional().isURL(),
     ])
         try {
-            const user = await User.findById(req.user.id);
+            const user = await User.findById(req.params.id);
+
+            if(!user) return res.status(404).json({ message: "User Not Found"});
             if (user.role !== 'alumni') return res.status(403).json({ message: 'Not an alumni' });
 
             Object.assign(user.profile, req.body.profile);
@@ -301,6 +303,7 @@ exports.respondMentorshipRequest = [
 ];
 
 // This function alows students and mentors to send messages within a mentorship
+// future implementation
 exports.sendMessage = [
     param('mentorshipId').isMongoId(),
     body('content').notEmpty().trim(),

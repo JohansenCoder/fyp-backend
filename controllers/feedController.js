@@ -103,10 +103,10 @@ exports.createPost =
             body('tags').optional().isArray()
         ])
         try {
-            if (!['admin', 'staff'].includes(req.user.role)) {
-                return res.status(403).json({ message: 'Only admins or staff can post' });
+            if(req.user.role=='vivtor'){
+                return res.status(404).json({message: "Visitors can not create posts"})
             }
-
+           
             const post = new PostSchema({
                 ...req.body,
                 postedBy: req.user.id,
