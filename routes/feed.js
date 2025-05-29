@@ -1,5 +1,5 @@
 const express = require('express');
-const { getFeed,createStory,createPost,reactToPost,commentOnPost, viewStory, getAnalytics} = require('../controllers/feedController');
+const { getFeed,createStory,createPost,reactToPost,commentOnPost, viewStory, deleteStory, getAnalytics} = require('../controllers/feedController');
 const {authMiddleware, restrictToSystemAdmin, restrictToAdmin} = require('../middlewares/auth');
 
 

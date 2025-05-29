@@ -16,7 +16,7 @@ const logger = winston.createLogger({
 exports.register = async (req, res) => {
     try {
         // Added 'college' to destructured fields
-        let { username, email, password, role, profile } = req.body;
+        let { username, email,college, password, role, profile } = req.body;
 
         // Sanitize inputs
         username = sanitize(username);
@@ -42,6 +42,7 @@ exports.register = async (req, res) => {
             email,
             password: hashedPassword,
             role,
+            college,
             profile,
         });
         await user.save();

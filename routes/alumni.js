@@ -1,7 +1,7 @@
 const express = require('express');
 const { updateAlumniProfile,searchAlumni,createConnectionRequest,respondConnectionRequest,getConnections,
         createJobOpportunity,getJobOpportunities,searchMentors,createMentorshipRequest,
-        respondMentorshipRequest,sendMessage,getMessages } = require('../controllers/alumniController');
+        respondMentorshipRequest, closeJobOpportunity } = require('../controllers/alumniController');
 const {authMiddleware,restrictToAdmin, restrictToAlumni, restrictToStudent} = require('../middlewares/auth');
 const router = express.Router();
 
