@@ -30,7 +30,7 @@ const announcements = require("./routes/announcements");
 const users = require("./routes/users");
 const news = require("./routes/news");
 const events = require("./routes/events");
-const adminLogs = require("./routes/auditLogs");
+const auditLogs = require("./routes/auditLogs");
 const emergencyContacts = require("./routes/emergencyContact")
 const authRoutes = require("./routes/AuthRoutes");
 const alumni = require("./routes/alumni");
@@ -63,7 +63,7 @@ app.use("/api/announcements", announcements)
 app.use("/api/users", users)
 app.use("/api/news", news)
 app.use("/api/events", events)
-app.use("/api/adminLogs", adminLogs)
+app.use("/api/auditLogs", auditLogs)
 app.use("/api/emergencyContacts", emergencyContacts)
 app.use("/api/authentication",authSecurity, authRoutes)
 app.use("/api/alumni", alumni)

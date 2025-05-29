@@ -1,7 +1,7 @@
 // routes/events.js
 const express = require('express');
 const router = express.Router();
-const { authMiddleware, restrictToSystemAdmin, restrictToOrganizer } = require('../middlewares/auth');
+const { authMiddleware, restrictToSystemAdmin, restrictToAdmin } = require('../middlewares/auth');
 const upload = require('../middlewares/upload');
 const { uploadAlmanac,getAlmanacEvents,createDynamicEvent,getDynamicEvents,updateDynamicEvent,cancelDynamicEvent,registerForEvent,unregisterFromEvent} = require('../controllers/eventController');
 const { registerDeviceToken, updateFcmToken } = require('../controllers/notificationController');
@@ -13,16 +13,16 @@ router.post('/almanac/upload', authMiddleware, restrictToSystemAdmin, upload.sin
 router.get('/almanac', authMiddleware, getAlmanacEvents);
 
 // Create dynamic event (organizer/admin only)
-router.post('/dynamic', authMiddleware, restrictToOrganizer, createDynamicEvent);
+router.post('/dynamic', authMiddleware, restrictToAdmin, createDynamicEvent);
 
 // Get dynamic events (filtered by user’s college/interests)
 router.get('/dynamic', authMiddleware, getDynamicEvents);
 
 // update dynamic event (organizer only)
-router.put('/dynamic/:id', authMiddleware, restrictToOrganizer, updateDynamicEvent);
+router.put('/dynamic/:id', authMiddleware, restrictToAdmin, updateDynamicEvent);
 
 // Cancel dynamic event (organizer only)
-router.delete('/dynamic/:id', authMiddleware, restrictToOrganizer, cancelDynamicEvent);
+router.delete('/dynamic/:id', authMiddleware, restrictToAdmin, cancelDynamicEvent);
 
 // register to event/category
 router.post('/register', authMiddleware, registerForEvent);

@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { getAllAnnouncements, createAnnouncement, getAnnouncementById, updateAnnouncement, deleteAnnouncement } = require("../controllers/announcementController");
-const {authMiddleware, restrictToAdmin,restrictToSystemAdmin} = require("../middlewares/auth");
+const {authMiddleware, restrictToAdmin} = require("../middlewares/auth");
 
 
 // post announcement (admin only)

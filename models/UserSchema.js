@@ -38,7 +38,7 @@ const userSchema = new mongoose.Schema({
         posts: { type: Boolean, default: true },
         adminActions: { type: Boolean, default: true }, // For admin notifications
     },
-    fcmTokens: [{ type: String }], // Multiple device support
+    fcmTokens: [{ type: String , required: true}], // Multiple device support
     lastActive: { type: Date, default: Date.now }, // For session timeout
     createdAt: { type: Date, default: Date.now },
 });

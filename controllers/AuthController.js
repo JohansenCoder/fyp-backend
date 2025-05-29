@@ -14,16 +14,6 @@ const logger = winston.createLogger({
 });
 
 exports.register = async (req, res) => {
-    // validate request body
-    validate([
-        body('username').notEmpty().message('Username should not be empty').trim(),
-        body('email').notEmpty().isEmail().message('Invalid email format').trim(),
-        body('password').notEmpty().isLength({ min: 6 }).message('Password must be at least 6 characters long').trim(),
-        body('role').notEmpty().isIn(['visitor']).message('Role must be visitor').trim(),
-        body('profile').Optional().isObject().withMessage('Profile must be an object'),
-        body('profile.firstName').Optional().isString().withMessage('First name must be a string').trim(),
-        body('profile.lastName').Optional().isString().withMessage('Last name must be a string').trim(),
-    ])
     try {
         // Added 'college' to destructured fields
         let { username, email, password, role, profile } = req.body;
@@ -31,7 +21,6 @@ exports.register = async (req, res) => {
         // Sanitize inputs
         username = sanitize(username);
         email = sanitize(email);
-        college = sanitize(college); // Sanitize college field
         if (profile) {
             profile.firstName = sanitize(profile.firstName);
             profile.lastName = sanitize(profile.lastName);
@@ -41,8 +30,8 @@ exports.register = async (req, res) => {
         // Check for existing user
         const existingUser = await User.findOne({ $or: [{ username }, { email }] });
         if (existingUser) {
-            return res.status(400).json({ message: 'Username or email already exists' });
-        }
+            return res.status(400).json({ message: 'Username or email already exists' })
+        };
 
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -167,17 +156,17 @@ exports.login = async (req, res) => {
 
 exports.forgotPassword = async (req, res) => {
     try {
-        const { email } = req.body;
-        const user = await User.findOne({ email });
+        const { email, username } = req.body;
+        const user = await User.findOne({ username});
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ message: 'User with that email not found' });
         }
         const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
         await sendEmail({
             to: email,
             subject: 'UDSM Connect Password Reset',
             text: `Use this token to reset your password: ${resetToken}\nLink: http://localhost:7000/reset-password?token=${resetToken}`,
-            html: `<p>Use this token to reset your password: <b>${resetToken}</b></p><p><a href="http://localhost:7000/reset-password?token=${resetToken}">Reset Password</a></p>`,
+            html: `<p>Use this token to reset your password: <b>${resetToken}</b></p><p><a href="http://localhost:7000/api/authentication/reset-password">Reset Password</a></p>`,
         });
 
         // Log password reset request

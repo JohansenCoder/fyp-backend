@@ -195,6 +195,36 @@ exports.createJobOpportunity =
     }
 ;
 
+// close a job opportunity
+exports.closeJobOpportunity = async (req, res) => {
+    try {
+        const job = await JobOpportunity.findById(req.params.id);
+        if (!job) return res.status(404).json({ message: 'Job opportunity not found' });
+        job.status = 'closed';
+        await job.save();
+        await notifyJobOpportunity(job);
+        // Log the action
+        const logId = await logAdminAction({
+            admin: req.user,
+            action: 'job opportunity closed',
+            targetResource: 'JobOpportunity',
+            targetId: job._id,
+        });
+        await notifyAdminAction({
+            college: job.college,
+            message: `Job Opportunity "${job.title}" closed`,
+            actionType: 'Job Opportunity Closed',
+            logId,
+        });
+        res.json(job);
+    } catch (error) {
+        logger.error(`Close job opportunity error: ${error.message}`);
+        res.status(500).json({ message: 'Failed to close job opportunity' });
+    }
+};
+
+
+
 // This function fetches job opportunities based on college and department
 // It retrieves all job opportunities that are still open (deadline not passed)
 exports.getJobOpportunities = async (req, res) => {

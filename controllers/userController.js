@@ -1,6 +1,7 @@
 const User = require('../models/UserSchema');
 const AuditLog = require('../models/AuditLogSchema');
 const bcrypt = require("bcryptjs");
+const jwt = require('jsonwebtoken');
 const { logAdminAction } = require('../utils/auditLog');
 const { notifyAdminAction } = require('../services/notificationService');
 
@@ -58,7 +59,7 @@ exports.createUser = async (req, res) => {
             college: user.college,
             message: `User "${user.username}" created`,
             actionType: 'User Created',
-            logId,
+            logId: AuditLog._id,
         });
 
         return res.status(201).json({
@@ -80,8 +81,7 @@ exports.getAllUsers = async (req, res) => {
             admin: req.user,
             action: 'view_users',
             targetResource: 'user',
-            targetId: null, // No specific user
-            details: { page, limit, role, college },
+            targetId: null, // No specific user,
             ipAddress: req.ip,
         });
         
@@ -109,13 +109,30 @@ exports.getUserById = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
     try {
-        const { role, profile } = req.body;
+        const { profile } = req.body;
+        // role should be obtained from the token
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const role = decoded.role;
         const user = await User.findById(req.params.id);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
-
-        if (role) user.role = role;
+        if (role !== 'system_admin') {
+            return res.status(403).json({ message: 'Only system admin can update role' });
+        }
+        if(req.body.role){
+            user.role = req.body.role;
+        }
+        if(req.body.username){
+            user.username = req.body.username;
+        }
+        if(req.body.email){
+            user.email = req.body.email;
+        }
+        if(req.body.college){ 
+            user.college = req.body.college;
+        }
         if (profile) {
             user.profile = {
                 ...user.profile,
@@ -134,13 +151,32 @@ exports.updateUser = async (req, res) => {
                 jobTitle: profile.jobTitle || user.profile.jobTitle,
             };
         }
-
+        // Hash password if provided
+        if (req.body.password) {
+            const hashedPassword = await bcrypt.hash(req.body.password, 10);
+            user.password = hashedPassword;
+        }
+        // Update other fields if any
+        if (req.body.notificationPreferences) {
+            user.notificationPreferences = {
+                ...user.notificationPreferences,
+                ...req.body.notificationPreferences,
+            };
+        }
+        if (req.body.interests) {
+            user.interests = req.body.interests;
+        }
+        if (req.body.fcmTokens) {
+            user.fcmTokens = req.body.fcmTokens;
+        }
+        Object.assign(user, req.body); // Update other fields if any
         await user.save();
 
         // Log admin action
         await AuditLog.create({
             action: 'user_updated',
             performedBy: req.user._id,
+            role: req.user.role,
             targetUser: user._id,
             targetResource: 'user',
             targetId: user._id,
@@ -151,7 +187,7 @@ exports.updateUser = async (req, res) => {
             college: user.college,
             message: `User "${user.username}" updated`,
             actionType: 'User Updated',
-            logId,
+            logId : AuditLog.id,
         });
 
         res.json({ message: 'User updated successfully', user });

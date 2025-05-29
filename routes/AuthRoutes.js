@@ -43,7 +43,7 @@ router.post(
         body('profile.phone').optional().trim(),
         body('profile.faculty').optional().trim(),
     ]),
-    authSecurity,
+    authSecurity, 
     authController.register
 );
 

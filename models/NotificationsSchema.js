@@ -13,7 +13,7 @@ const NotificationSchema = new mongoose.Schema({
     // Type of the content the notification is linked to
     sourceType: {
       type: String,
-      enum: ['announcement', 'news', 'event'],
+      // enum: ['announcement', 'news', 'event'],
       required: true
     },
   

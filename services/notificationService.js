@@ -38,7 +38,7 @@ exports.sendPushNotification = async ({ tokens, title, body, data = {} }) => {
     };
 
     try {
-        const response = await admin.messaging().sendMulticast(message);
+        const response = await admin.messaging().send(message);
         logger.info(`Sent notifications to ${response.successCount} devices`);
 
         if (response.failureCount) {

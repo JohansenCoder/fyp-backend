@@ -11,7 +11,10 @@ router.get('/', authMiddleware, getFeed);
 // Create story (admin only)
 router.post('/stories', authMiddleware, restrictToAdmin, createStory);
 
-// Create post (admins only)
+// delete a story
+router.delete('/stories/:id', authMiddleware, restrictToAdmin, deleteStory);
+
+// Create post 
 router.post('/posts', authMiddleware, createPost);
 // React to post 
 router.post('/posts/react/:id', authMiddleware, reactToPost);

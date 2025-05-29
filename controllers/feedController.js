@@ -91,6 +91,32 @@ exports.createStory =
         }
     };
 
+// delete a story
+exports.deleteStory = async (req, res) => {
+    try {
+        const story = await StorySchema.findById(req.params.id);
+        if (!story) return res.status(404).json({ message: 'Story not found' });
+        await story.deleteOne();
+        // log the action
+        const logId = await logAdminAction({
+            admin: req.user,
+            action: 'story_deleted',
+            targetResource: 'story',
+            targetId: story._id,
+        });
+        await notifyAdminAction({
+            college: story.college,
+            message: `Story "${story.content}" deleted`,
+            actionType: 'Story Deletion',
+            logId,
+        });
+        res.json({ message: 'Story deleted successfully' });
+    } catch (error) {
+        logger.error(`Delete story error: ${error.message}`);
+        res.status(500).json({ message: 'Failed to delete story' });
+    }
+};
+
 // Create post
 exports.createPost = 
     async (req, res) => {

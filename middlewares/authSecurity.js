@@ -31,7 +31,7 @@ const rateLimiter = rateLimit({
 
 // Suspicious activity tracking
 const trackSuspiciousActivity = async (req, res, next) => {
-    const { username } = req.body;
+    const { username} = req.body;
 
     // Skip if no username (e.g., for forgot-password)
     if (!username) {

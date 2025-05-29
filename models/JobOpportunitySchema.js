@@ -9,7 +9,8 @@ const JobOpportunitySchema = new mongoose.Schema({
   applicationLink: { type: String, trim: true }, // e.g., "https://udsm.ac.tz/apply"
   deadline: { type: Date }, // e.g., "2025-06-01"
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Admin
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  status: { type: String, enum: ['active', 'closed'], default: 'active' }
   });
 
 module.exports = mongoose.model('JobOpportunity', JobOpportunitySchema);

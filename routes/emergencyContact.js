@@ -8,7 +8,7 @@ const {authMiddleware, restrictToSystemAdmin} = require('../middlewares/auth');
 router.post('/', authMiddleware, restrictToSystemAdmin, createEmergencyContact);
 
 // get emergency contacts
-router.get('/getEmergencyContacts', authMiddleware, getEmergencyContacts);
+router.get('/', authMiddleware, getEmergencyContacts);
 
 
 // update an Emergency contact (admin only)

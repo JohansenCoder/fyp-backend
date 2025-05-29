@@ -4,6 +4,7 @@ const dynamicEventSchema = new mongoose.Schema({
     title: { type: String, required: true }, // e.g., "AI Workshop"
     description: { type: String, required: true },
     category: { type: String, enum: ['workshop', 'seminar', 'conference', 'webinar'], required: true },
+    organizer: { type: String, required: true },
     imageUrl: { type: String }, // URL to the event image
     maxAttendees: { type: Number }, // Optional, max number of attendees
     registrationLink: { type: String }, // Optional, link for registration
