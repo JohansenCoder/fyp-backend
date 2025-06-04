@@ -7,6 +7,14 @@ const Registration = require('../models/RegistrationSchema');
 const User = require('../models/UserSchema');
 const {validate} = require('../middlewares/validate');
 const {logAdminAction} = require('../utils/auditLog');
+const StudentEngagementTracker = require('../utils/studentEngagement');
+const winston = require('winston');
+const { body } = require('express-validator');
+
+const logger = winston.createLogger({
+    transports: [new winston.transports.Console()],
+});
+
 
 // Upload and process almanac PDF
 exports.uploadAlmanac = async (req, res) => {
@@ -217,14 +225,18 @@ exports.registerForEvent = [
            });
            if (existingRegistration) {
             return res.status(400).json({ message: 'Already registered' });
-         }
-
-            // Create registration
+         }            // Create registration
             const registration = new Registration({
                 user: req.user._id,
                 event: event._id,
             });
             await registration.save();
+
+            // Track student engagement for event registration
+            if (req.user.role === 'student') {
+                await StudentEngagementTracker.incrementEventRegistration(req.user._id, event._id);
+            }
+
             // send notification
             const user = await User.findById(req.user.id).select('fcmTokens');
             if (user.fcmTokens?.length) {
@@ -260,10 +272,14 @@ exports.unregisterFromEvent =
             if (!registration) {
                 return res.status(400).json({ message: 'Not registered' });
             }
-           
-            // update the status to unregistered
+             // update the status to unregistered
             registration.status = 'unregistered';
             await registration.save();
+
+            // Track student engagement for event unregistration
+            if (req.user.role === 'student') {
+                await StudentEngagementTracker.decrementEventRegistration(req.user._id, event._id);
+            }
 
             res.json({ message: 'Unregistered successfully' });
         } catch (error) {

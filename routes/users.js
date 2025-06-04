@@ -1,9 +1,9 @@
 const express = require('express');
 const passport = require('passport');
-const { getAllUsers, getUserById, createUser, updateUser, deleteUser, getProfile, updateProfile } = require("../controllers/userController");
+const { getAllUsers, getUserById, createUser, updateUser, deleteUser, getProfile, updateProfile, getStudentEngagement, getAllStudentEngagement, getMyEngagement } = require("../controllers/userController");
 const validate = require('../middlewares/validate');
 const { body } = require('express-validator');
-const {restrictToAdmin, authMiddleware} = require('../middlewares/auth')
+const {restrictToAdmin, authMiddleware, restrictToStudent} = require('../middlewares/auth')
 
 const router = express.Router();
 
@@ -67,10 +67,31 @@ router.put(
 );
 
 router.delete(
-    '/:id',
-    authMiddleware,
+    '/:id',    authMiddleware,
     restrictToAdmin,
     deleteUser
+);
+
+// Student engagement routes
+router.get(
+    '/engagement/my',
+    authMiddleware,
+    restrictToStudent,
+    getMyEngagement
+);
+
+router.get(
+    '/engagement/all',
+    authMiddleware,
+    restrictToAdmin,
+    getAllStudentEngagement
+);
+
+router.get(
+    '/engagement/:id',
+    authMiddleware,
+    restrictToAdmin,
+    getStudentEngagement
 );
 
 module.exports = router;

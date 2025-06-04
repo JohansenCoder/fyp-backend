@@ -4,6 +4,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require('jsonwebtoken');
 const { logAdminAction } = require('../utils/auditLog');
 const { notifyAdminAction } = require('../services/notificationService');
+const StudentEngagementTracker = require('../utils/studentEngagement');
 
 exports.getProfile = async (req, res) => {
     try {
@@ -224,5 +225,50 @@ exports.deleteUser = async (req, res) => {
         res.json({ message: 'User deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Failed to delete user', error: error.message });
+    }
+};
+
+// Get student engagement statistics
+exports.getStudentEngagement = async (req, res) => {
+    try {
+        const studentId = req.params.id;
+        const stats = await StudentEngagementTracker.getStudentEngagementStats(studentId);
+        
+        if (!stats) {
+            return res.status(404).json({ message: 'Student not found or not a student' });
+        }
+        
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch student engagement', error: error.message });
+    }
+};
+
+// Get all students engagement statistics (admin only)
+exports.getAllStudentEngagement = async (req, res) => {
+    try {
+        const stats = await StudentEngagementTracker.getAllStudentEngagementStats();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch student engagement statistics', error: error.message });
+    }
+};
+
+// Get current user's engagement statistics (for students)
+exports.getMyEngagement = async (req, res) => {
+    try {
+        if (req.user.role !== 'student') {
+            return res.status(403).json({ message: 'Only students can view engagement statistics' });
+        }
+        
+        const stats = await StudentEngagementTracker.getStudentEngagementStats(req.user.id);
+        
+        if (!stats) {
+            return res.status(404).json({ message: 'Engagement data not found' });
+        }
+        
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch engagement statistics', error: error.message });
     }
 };

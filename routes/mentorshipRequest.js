@@ -15,3 +15,5 @@ router.patch('/:requestId', authMiddleware, restrictToStudent, updateRequestStat
 
 // Route to delete a mentorship request     
 router.delete('/:id', authMiddleware, restrictToStudent,  deleteRequest);
+
+module.exports = router;

@@ -7,6 +7,8 @@ const Message = require('../models/MessageSchema');
 const { notifyJobOpportunity, notifyMentorshipRequest, notifyMentorshipStatus, notifyAdminAction } = require('../services/notificationService');
 const winston = require('winston');
 const {validate} = require('../middlewares/validate');
+const StudentEngagementTracker = require('../utils/studentEngagement');
+const { logAdminAction } = require('../utils/auditLog');
 
 const logger = winston.createLogger({
     transports: [new winston.transports.Console()],
@@ -123,10 +125,17 @@ exports.respondConnectionRequest = [
             }
             if (connection.status !== 'pending') {
                 return res.status(400).json({ message: 'Connection already responded' });
-            }
-
-            connection.status = req.body.status;
+            }            connection.status = req.body.status;
             await connection.save();
+            
+            // Track student engagement if a student's connection is accepted
+            if (req.body.status === 'accepted') {
+                const requester = await User.findById(connection.requester);
+                if (requester && requester.role === 'student') {
+                    await StudentEngagementTracker.incrementAlumniConnection(connection.requester, req.user.id);
+                }
+            }
+            
             res.json(connection);
         } catch (error) {
             logger.error(`Respond connection error: ${error.message}`);
@@ -287,14 +296,16 @@ exports.createMentorshipRequest = [
             });
             if (existingMentorship) {
                 return res.status(400).json({ message: 'Mentorship request already exists' });
-            }
-
-            const mentorship = new Mentorship({
+            }            const mentorship = new Mentorship({
                 student: req.user.id,
                 mentor: req.params.id,
                 status: 'pending'
             });
             await mentorship.save();
+            
+            // Track student engagement for mentorship request
+            await StudentEngagementTracker.incrementMentorshipRequest(req.user.id, req.params.id);
+            
             await notifyMentorshipRequest(mentorship);
             res.status(201).json(mentorship);
         } catch (error) {
@@ -319,10 +330,14 @@ exports.respondMentorshipRequest = [
             }
             if (mentorship.status !== 'pending') {
                 return res.status(400).json({ message: 'Mentorship already responded' });
-            }
-
-            mentorship.status = req.body.status;
+            }            mentorship.status = req.body.status;
             await mentorship.save();
+            
+            // Track student engagement if mentorship is accepted
+            if (req.body.status === 'accepted') {
+                await StudentEngagementTracker.incrementActiveMentorship(mentorship.student, req.user.id);
+            }
+            
             await notifyMentorshipStatus(mentorship, req.body.status);
             res.json(mentorship);
         } catch (error) {

@@ -7,6 +7,7 @@ const { notifyNewStory, notifyNewPost, notifyAdminAction } = require('../service
 const winston = require('winston');
 const { logAdminAction } = require('../utils/auditLog');
 const { validate } = require('../middlewares/validate');
+const StudentEngagementTracker = require('../utils/studentEngagement');
 
 const logger = winston.createLogger({
     transports: [new winston.transports.Console()],
@@ -132,12 +133,17 @@ exports.createPost =
             if(req.user.role=='vivtor'){
                 return res.status(404).json({message: "Visitors can not create posts"})
             }
-           
-            const post = new PostSchema({
+             const post = new PostSchema({
                 ...req.body,
                 postedBy: req.user.id,
             });
             await post.save();
+            
+            // Track student engagement for post creation
+            if (req.user.role === 'student') {
+                await StudentEngagementTracker.incrementPostCount(req.user.id);
+            }
+            
             await notifyNewPost(post);
             // log the action
             const logId = await logAdminAction({

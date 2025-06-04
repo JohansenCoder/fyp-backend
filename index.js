@@ -35,6 +35,7 @@ const emergencyContacts = require("./routes/emergencyContact")
 const authRoutes = require("./routes/AuthRoutes");
 const alumni = require("./routes/alumni");
 const feed = require('./routes/feed');
+const mentorshipRequest = require('./routes/mentorshipRequest');
 
 
 
@@ -68,6 +69,7 @@ app.use("/api/emergencyContacts", emergencyContacts)
 app.use("/api/authentication",authSecurity, authRoutes)
 app.use("/api/alumni", alumni)
 app.use("/api/feed", feed)
+app.use("/api/mentorshipRequest", mentorshipRequest)
 
 // Error handling
 app.use(errorHandler);
