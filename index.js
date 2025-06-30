@@ -65,9 +65,9 @@ app.use('/uploads', express.static('uploads')); // Serve uploaded files
 
 // routes
 app.get("/", (req, res) => {
-    return res.json({
-        message: "Your server is running!"
-    })
+  return res.json({
+    message: "Your server is running!"
+  })
 })
 
 app.use("/api/announcements", announcements)
