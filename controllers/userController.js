@@ -4,12 +4,12 @@ const bcrypt = require("bcryptjs");
 const jwt = require('jsonwebtoken');
 const { logAdminAction } = require('../utils/auditLog');
 const { notifyAdminAction } = require('../services/notificationService');
-const StudentEngagementTracker = require('../utils/studentEngagement');
+const EngagementTracker = require('../utils/engagement');
 
 exports.getProfile = async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
-        if(!user) return res.status(404).json({ message: 'User not found' });
+        if (!user) return res.status(404).json({ message: 'User not found' });
 
         res.json(user);
     } catch (error) {
@@ -22,7 +22,7 @@ exports.updateProfile = async (req, res) => {
         const { profile } = req.body;
         const user = await User.findById(req.params.id);
 
-        if(!user) return res.status(404).json({ message: 'User not found' });
+        if (!user) return res.status(404).json({ message: 'User not found' });
 
         user.profile = {
             ...user.profile,
@@ -35,7 +35,7 @@ exports.updateProfile = async (req, res) => {
         };
 
         await user.save();
-        res.json({ message: 'Profile updated successfully', user });
+        res.json({ user });
     } catch (error) {
         res.status(500).json({ message: 'Failed to update profile', error: error.message });
     }
@@ -76,16 +76,18 @@ exports.getAllUsers = async (req, res) => {
     try {
         const users = await User.find();
 
-        if(!users) return res.status(404).json({message:"No Users Found!!"})
+        if (!users) return res.status(404).json({ message: "No Users Found!!" })
 
         await logAdminAction({
             admin: req.user,
             action: 'view_users',
             targetResource: 'user',
-            targetId: null, // No specific user,
+            targetId: req.user._id, // Use the admin's own id as targetId for this action
+            details: { count: users.length },
             ipAddress: req.ip,
+            performedBy: req.user._id, // Add performedBy field
         });
-        
+
         res.status(200).json({
             message: "Users fetched successfully",
             users: users
@@ -122,16 +124,16 @@ exports.updateUser = async (req, res) => {
         if (role !== 'system_admin') {
             return res.status(403).json({ message: 'Only system admin can update role' });
         }
-        if(req.body.role){
+        if (req.body.role) {
             user.role = req.body.role;
         }
-        if(req.body.username){
+        if (req.body.username) {
             user.username = req.body.username;
         }
-        if(req.body.email){
+        if (req.body.email) {
             user.email = req.body.email;
         }
-        if(req.body.college){ 
+        if (req.body.college) {
             user.college = req.body.college;
         }
         if (profile) {
@@ -150,6 +152,8 @@ exports.updateUser = async (req, res) => {
                 expertise: profile.expertise || user.profile.expertise,
                 company: profile.company || user.profile.company,
                 jobTitle: profile.jobTitle || user.profile.jobTitle,
+                registrationNumber: profile.registrationNumber || user.profile.registrationNumber,
+                mentorshipAvailability: profile.mentorshipAvailability !== undefined ? profile.mentorshipAvailability : user
             };
         }
         // Hash password if provided
@@ -170,26 +174,10 @@ exports.updateUser = async (req, res) => {
         if (req.body.fcmTokens) {
             user.fcmTokens = req.body.fcmTokens;
         }
-        Object.assign(user, req.body); // Update other fields if any
+        Object.assign(user); // Update other fields if any
         await user.save();
 
-        // Log admin action
-        await AuditLog.create({
-            action: 'user_updated',
-            performedBy: req.user._id,
-            role: req.user.role,
-            targetUser: user._id,
-            targetResource: 'user',
-            targetId: user._id,
-            details: `User ${user.username} updated (role: ${role}, profile: ${JSON.stringify(profile)})`,
-        });
-        // Notify admin action
-        await notifyAdminAction({
-            college: user.college,
-            message: `User "${user.username}" updated`,
-            actionType: 'User Updated',
-            logId : AuditLog.id,
-        });
+        
 
         res.json({ message: 'User updated successfully', user });
     } catch (error) {
@@ -197,17 +185,49 @@ exports.updateUser = async (req, res) => {
     }
 };
 
+exports.updateUserStatus = async (req, res) => {
+    try {
+        const { isActive } = req.body;
+        const user = await User.findByIdAndUpdate(
+            req.params.id,
+            { isActive },
+            { new: true }
+        );
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        await logAdminAction({
+            admin: req.user,
+            action: 'update_user_status',
+            targetResource: 'user',
+            targetId: user._id,
+            details: { username: user.username, isActive },
+            ipAddress: req.ip,
+        });
+        await notifyAdminAction({
+            college: user.college,
+            message: `User "${user.username}" status updated to ${isActive ? 'active' : 'inactive'}`,
+            actionType: 'User Status Updated',
+        });
+        res.json({ message: 'User status updated', user });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to update user status', error: error.message });
+    }
+};
+
+
 exports.deleteUser = async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ message: 'User not found at all' });
         }
 
+    
         await User.findByIdAndDelete(req.params.id);
-
+    res.json({ message: 'User deleted successfully' });
         // Log admin action
-        await AuditLog.create({
+        const log = await AuditLog.create({
             action: 'user_deleted',
             performedBy: req.user._id,
             targetUser: user._id,
@@ -220,11 +240,11 @@ exports.deleteUser = async (req, res) => {
             college: user.college,
             message: `User "${user.username}" deleted`,
             actionType: 'User Deleted',
-            logId,
+            logId: log._id,
         });
-        res.json({ message: 'User deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Failed to delete user', error: error.message });
+        console.log('Error deleting user:', error);
     }
 };
 
@@ -233,11 +253,11 @@ exports.getStudentEngagement = async (req, res) => {
     try {
         const studentId = req.params.id;
         const stats = await StudentEngagementTracker.getStudentEngagementStats(studentId);
-        
+
         if (!stats) {
             return res.status(404).json({ message: 'Student not found or not a student' });
         }
-        
+
         res.json(stats);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch student engagement', error: error.message });
@@ -260,13 +280,13 @@ exports.getMyEngagement = async (req, res) => {
         if (req.user.role !== 'student') {
             return res.status(403).json({ message: 'Only students can view engagement statistics' });
         }
-        
+
         const stats = await StudentEngagementTracker.getStudentEngagementStats(req.user.id);
-        
+
         if (!stats) {
             return res.status(404).json({ message: 'Engagement data not found' });
         }
-        
+
         res.json(stats);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch engagement statistics', error: error.message });

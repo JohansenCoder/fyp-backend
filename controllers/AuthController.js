@@ -13,65 +13,139 @@ const logger = winston.createLogger({
     transports: [new winston.transports.Console()],
 });
 
+
 exports.register = async (req, res) => {
     try {
-        // Added 'college' to destructured fields
-        let { username, email,college, password, role, profile } = req.body;
-
-        // Sanitize inputs
-        username = sanitize(username);
-        email = sanitize(email);
-        if (profile) {
-            profile.firstName = sanitize(profile.firstName);
-            profile.lastName = sanitize(profile.lastName);
-        }
-
-
-        // Check for existing user
-        const existingUser = await User.findOne({ $or: [{ username }, { email }] });
-        if (existingUser) {
-            return res.status(400).json({ message: 'Username or email already exists' })
-        };
-
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Create user with college field
-        const user = new User({
-            username,
-            email,
-            password: hashedPassword,
-            role,
-            college,
-            profile,
-        });
-        await user.save();
-
-        // Generate JWT
-        const token = jwt.sign(
-            { id: user._id, role: user.role },
-            process.env.JWT_SECRET,
-            { expiresIn: '15m' }
-        );
-
-       
-
-        res.status(201).json({
-            message: 'User registered successfully',
-            token,
-            user: {
-                id: user._id,
-                username: user.username,
-                role: user.role,
-                profile: user.profile,
-            },
-        });
+      // Destructure fields from req.body, including schema-specific fields
+      let {
+        username,
+        email,
+        college,
+        password,
+        role,
+        profile,
+        notificationPreferences,
+        engagement,
+        interests = [],
+        achievements = [],
+        education = [],
+        workExperience = [],
+        expertise = [],
+        posts = [],
+        relationships = [],
+        fcmTokens = [],
+      } = req.body;
+  
+      // Sanitize inputs
+      username = sanitize(username);
+      email = sanitize(email);
+      if (profile) {
+        profile.firstName = sanitize(profile.firstName);
+        profile.lastName = sanitize(profile.lastName);
+        if (profile.department) profile.department = sanitize(profile.department);
+        if (profile.location) profile.location = sanitize(profile.location);
+        if (profile.phone) profile.phone = sanitize(profile.phone);
+        if (profile.bio) profile.bio = sanitize(profile.bio);
+        if (profile.profilePicture) profile.profilePicture = sanitize(profile.profilePicture);
+      }
+  
+      // Validate required fields
+      if (!username || !email || !password || !role || !profile?.firstName || !profile?.lastName) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+  
+      // Validate college for student and college_admin roles
+      if ((role === 'student' || role === 'college_admin') && !college) {
+        return res.status(400).json({ message: 'College is required for this role' });
+      }
+  
+      // Check for existing user
+      const existingUser = await User.findOne({ $or: [{ username }, { email }] });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Username or email already exists' });
+      }
+  
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+  
+      // Set defaults for engagement if not provided for student/alumni
+      const engagementDefaults = {
+        postsCreated: 0,
+        alumniConnections: 0,
+        eventsRegistered: 0,
+        eventsAttended: 0,
+        mentorshipRequests: 0,
+        activeMentorships: 0,
+      };
+  
+      // Create user data object
+      const userData = {
+        username,
+        email,
+        password: hashedPassword,
+        role,
+        college: role === 'student' || role === 'college_admin' ? college : undefined,
+        profile: {
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          department: profile.department || undefined,
+          location: profile.location || undefined,
+          phone: profile.phone || undefined,
+          bio: profile.bio || undefined,
+          profilePicture: profile.profilePicture || undefined,
+          mentorshipAvailability: role === 'alumni' ? profile.mentorshipAvailability || false : undefined,
+        },
+        notificationPreferences: {
+          events: true,
+          newsAndAnnouncements: true,
+          opportunities: true,
+          social: true,
+          admin: role.includes('admin') ? true : false,
+          ...notificationPreferences,
+        },
+        engagement: role === 'student' || role === 'alumni' ? { ...engagementDefaults, ...engagement } : undefined,
+        interests,
+        achievements,
+        education,
+        workExperience,
+        expertise,
+        posts,
+        relationships,
+        fcmTokens,
+      };
+  
+      // Create and save user
+      const user = new User(userData);
+      await user.save();
+  
+      // Generate JWT
+      const token = jwt.sign(
+        { id: user._id, role: user.role },
+        process.env.JWT_SECRET,
+        { expiresIn: '15m' }
+      );
+  
+      res.status(201).json({
+        message: 'User registered successfully',
+        token,
+        user: {
+          id: user._id,
+          username: user.username,
+          role: user.role,
+          profile: user.profile,
+        },
+      });
     } catch (error) {
-        logger.error(`Register error for ${req.body.username}: ${error.message}`);
-        res.status(500).json({ message: 'Registration failed', error: error.message });
+      logger.error(`Register error for ${req.body.username}: ${error.message}`);
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({
+          message: 'Validation failed',
+          errors: Object.values(error.errors).map(e => e.message),
+        });
+      }
+      res.status(500).json({ message: 'Registration failed', error: error.message });
     }
-};
-
+  };
 exports.login = async (req, res) => {
     try {
         let { username, password } = req.body;

@@ -1,6 +1,6 @@
 const express = require('express');
 const passport = require('passport');
-const { getAllUsers, getUserById, createUser, updateUser, deleteUser, getProfile, updateProfile, getStudentEngagement, getAllStudentEngagement, getMyEngagement } = require("../controllers/userController");
+const { getAllUsers, getUserById, createUser, updateUser,updateUserStatus, deleteUser, getProfile, updateProfile, getStudentEngagement, getAllStudentEngagement, getMyEngagement } = require("../controllers/userController");
 const validate = require('../middlewares/validate');
 const { body } = require('express-validator');
 const {restrictToAdmin, authMiddleware, restrictToStudent} = require('../middlewares/auth')
@@ -93,5 +93,12 @@ router.get(
     restrictToAdmin,
     getStudentEngagement
 );
+
+router.patch(
+    '/:id/status',
+    authMiddleware,
+    restrictToAdmin,
+    updateUserStatus
+  );
 
 module.exports = router;

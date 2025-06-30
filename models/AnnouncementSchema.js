@@ -7,9 +7,10 @@ const AnnouncementSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   targetRoles: [{
     type: String,
-    enum: ['student', 'staff', 'alumni', 'visitor']
+    enum: ['student', 'alumni', 'visitor'],
+    required: true
   }],
-  collegeScope: [{ type: String }],
+  college: [{ type: String, required: true }], // e.g., "CoICT", "CEES"
   location: {
     coordinates: {
       type: [Number], // [longitude, latitude]

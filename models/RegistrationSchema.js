@@ -11,7 +11,7 @@ const RegistrationSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['registered', 'unregistered'],
-    default: 'subscribed'
+    default: 'registered'
   }
 });
 // unique index to prevent duplicate subscriptions

@@ -6,8 +6,7 @@ const UserSchema = require('../models/UserSchema');
 const { notifyNewStory, notifyNewPost, notifyAdminAction } = require('../services/notificationService');
 const winston = require('winston');
 const { logAdminAction } = require('../utils/auditLog');
-const { validate } = require('../middlewares/validate');
-const StudentEngagementTracker = require('../utils/studentEngagement');
+const StudentEngagementTracker = require('../utils/engagement');
 
 const logger = winston.createLogger({
     transports: [new winston.transports.Console()],
@@ -48,13 +47,9 @@ exports.getFeed = async (req, res) => {
 };
 
 // Create story (admin only)
-exports.createStory = 
-  async (req, res) => {
-    // validate request body
-    validate([
-        body('content').notEmpty().trim(),
-        body('college').notEmpty().trim()
-    ])
+exports.createStory =
+    async (req, res) => {
+
         try {
             if (req.user.role !== 'admin' || req.user.college !== req.body.college) {
                 return res.status(403).json({ message: 'Only college admins can post stories' });
@@ -119,31 +114,24 @@ exports.deleteStory = async (req, res) => {
 };
 
 // Create post
-exports.createPost = 
+exports.createPost =
     async (req, res) => {
-        // validate request body
-        validate([
-            body('title').notEmpty().trim(),
-            body('content').notEmpty().trim(),
-            body('college').optional().trim(),
-            body('targetRoles').optional().isArray(),
-            body('tags').optional().isArray()
-        ])
+        // validate request bod
         try {
-            if(req.user.role=='vivtor'){
-                return res.status(404).json({message: "Visitors can not create posts"})
+            if (req.user.role == 'vivtor') {
+                return res.status(404).json({ message: "Visitors can not create posts" })
             }
-             const post = new PostSchema({
+            const post = new PostSchema({
                 ...req.body,
                 postedBy: req.user.id,
             });
             await post.save();
-            
+
             // Track student engagement for post creation
             if (req.user.role === 'student') {
                 await StudentEngagementTracker.incrementPostCount(req.user.id);
             }
-            
+
             await notifyNewPost(post);
             // log the action
             const logId = await logAdminAction({
@@ -169,6 +157,82 @@ exports.createPost =
             res.status(500).json({ message: 'Failed to create post' });
         }
     };
+
+    // Delete post
+exports.deletePost = [
+    param('id').isMongoId(),
+    async (req, res) => {
+        try {
+            const post = await PostSchema.findById(req.params.id);
+            if (!post) return res.status(404).json({ message: 'Post not found' });
+
+            // Check if user is authorized to delete the post
+            // Only post owner, college admins, or system admins can delete
+            const isOwner = post.postedBy.toString() === req.user.id;
+            const isCollegeAdmin = req.user.role === 'college_admin' && req.user.college === post.college;
+            const isSystemAdmin = req.user.role === 'system_admin';
+
+            if (!isOwner && !isCollegeAdmin && !isSystemAdmin) {
+                return res.status(403).json({ message: 'Not authorized to delete this post' });
+            }
+
+            // Store post details for logging before deletion
+            const postDetails = {
+                title: post.title,
+                college: post.college,
+                postedBy: post.postedBy
+            };
+
+            // Delete the post
+            await post.deleteOne();
+
+            // Update user's post count if it's in their posts array
+            await UserSchema.findByIdAndUpdate(
+                post.postedBy, 
+                { $pull: { 'profile.posts': post._id } }
+            );
+
+            // Track student engagement for post deletion (decrement)
+            if (req.user.role === 'student' && isOwner) {
+                await StudentEngagementTracker.decrementPostCount(req.user.id);
+            }
+
+            // Log the action
+            const logId = await logAdminAction({
+                admin: req.user,
+                action: 'post_deleted',
+                targetResource: 'post',
+                targetId: req.params.id,
+                details: { 
+                    title: postDetails.title, 
+                    college: postDetails.college,
+                    deletedBy: req.user.id,
+                    originalAuthor: postDetails.postedBy
+                },
+                ipAddress: req.ip,
+            });
+
+            // Notify admin about the post deletion
+            await notifyAdminAction({
+                college: postDetails.college,
+                message: `Post "${postDetails.title}" deleted by ${req.user.username}`,
+                actionType: 'Post Deletion',
+                logId,
+            });
+
+            res.json({ 
+                message: 'Post deleted successfully',
+                deletedPost: {
+                    id: req.params.id,
+                    title: postDetails.title
+                }
+            });
+        } catch (error) {
+            logger.error(`Delete post error: ${error.message}`);
+            res.status(500).json({ message: 'Failed to delete post' });
+        }
+    },
+];
 
 // React to post
 exports.reactToPost = [

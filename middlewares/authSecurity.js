@@ -31,10 +31,17 @@ const rateLimiter = rateLimit({
 
 // Suspicious activity tracking
 const trackSuspiciousActivity = async (req, res, next) => {
-    const { username} = req.body;
+    // Check if req.body exists
+    if (!req.body) {
+        logger.warn('Request body is undefined, skipping suspicious activity tracking');
+        return next();
+    }
+
+    const { username } = req.body;
 
     // Skip if no username (e.g., for forgot-password)
     if (!username) {
+        logger.info('No username provided, skipping suspicious activity tracking');
         return next();
     }
 

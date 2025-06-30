@@ -1,30 +1,28 @@
-// middleware/upload.js
+// middlewares/upload.js
 const multer = require('multer');
-const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('../config/cloudinary');
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, process.env.UPLOAD_DIR || './uploads');
-    },
-    filename: (req, file, cb) => {
-        const uniqueName = `almanac-${uuidv4()}${path.extname(file.originalname)}`;
-        cb(null, uniqueName);
-    }
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'udsm_events', // Cloudinary folder for uploads
+    allowed_formats: ['jpg', 'png', 'jpeg', 'mp4', 'mov'], // Allow images and videos
+    resource_type: 'auto', // Automatically detect resource type (image or video)
+  },
 });
 
-const fileFilter = (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-        cb(null, true);
-    } else {
-        cb(new Error('Only PDF files are allowed'), false);
-    }
-};
-
 const upload = multer({
-    storage,
-    fileFilter,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // Limit to 10MB
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|mp4|mov/;
+    const mimetype = filetypes.test(file.mimetype);
+    if (mimetype) {
+      return cb(null, true);
+    }
+    cb(new Error('File type not supported'));
+  },
 });
 
 module.exports = upload;

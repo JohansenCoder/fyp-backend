@@ -10,9 +10,6 @@ dotenv.config();
 // middleware imports
 const logger = require("./middlewares/logger");
 const errorHandler = require('./middlewares/errorHandler');
-const { authSecurity } = require("./middlewares/authSecurity");
-
-
 
 // config imports
 const passport = require("./config/passport");
@@ -36,6 +33,7 @@ const authRoutes = require("./routes/AuthRoutes");
 const alumni = require("./routes/alumni");
 const feed = require('./routes/feed');
 const mentorshipRequest = require('./routes/mentorshipRequest');
+const dashboard = require('./routes/dashboard');
 
 
 
@@ -43,7 +41,19 @@ const mentorshipRequest = require('./routes/mentorshipRequest');
 const app = express();
 
 // middlewares
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://192.168.1.3:3000',
+    'http://192.168.1.3:5173',
+    'http://192.168.1.5:3000',
+    'http://192.168.1.5:5173'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with']
+}));
 app.use(logger);
 app.use(helmet());
 app.use(morgan('combined')); // Log all requests
@@ -66,15 +76,19 @@ app.use("/api/news", news)
 app.use("/api/events", events)
 app.use("/api/auditLogs", auditLogs)
 app.use("/api/emergencyContacts", emergencyContacts)
-app.use("/api/authentication",authSecurity, authRoutes)
+app.use("/api/authentication", authRoutes)
 app.use("/api/alumni", alumni)
 app.use("/api/feed", feed)
 app.use("/api/mentorshipRequest", mentorshipRequest)
+app.use("/api/dashboard", dashboard);
 
 // Error handling
 app.use(errorHandler);
 
-PORT = process.env.PORT;
-app.listen(PORT, () => {
+PORT = process.env.PORT || 7000;
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`Local access: http://localhost:${PORT}`);
+  console.log(`Network access: http://192.168.1.5:${PORT}`);
+  console.log(`Server is accepting connections from all interfaces (0.0.0.0)`);
 });

@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 const NewsSchema = new mongoose.Schema({
-  headline: { type: String, required: true },
+  title: { type: String, required: true },
   content: { type: String, required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   category: {
@@ -16,9 +16,10 @@ const NewsSchema = new mongoose.Schema({
   tags: [{ type: String }],
   targetRoles: [{
     type: String,
-    enum: ['student', 'visitor', 'alumni']
+    enum: ['student', 'visitor', 'alumni'],
+    required: true
   }],
-  collegeScope: [{ type: String }],
+  college: [{ type: String, required: true }], // e.g., "CoICT", "CEES"
   isPublished: { type: Boolean, default: true },
   isArchived: { type: Boolean, default: false },
   scheduledAt: { type: Date },

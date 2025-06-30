@@ -8,11 +8,17 @@ const logger = winston.createLogger({
     ],
 });
 
-const logAdminAction = async ({ admin, action, targetResource, targetId, details, ipAddress }) => {
+const logAdminAction = async ({ admin, action, targetResource, targetId, details, ipAddress, performedBy }) => {
     try {
+        if (!performedBy) {
+            throw new Error('performedBy is required');
+        }
+        if (!targetId) {
+            throw new Error('targetId is required');
+        }
         const log = new AuditLogSchema({
             action,
-            performedBy: admin._id,
+            performedBy,
             role: admin.role,
             targetResource,
             targetId,

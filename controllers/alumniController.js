@@ -6,8 +6,7 @@ const Mentorship = require('../models/MentorshipRequestSchema');
 const Message = require('../models/MessageSchema');
 const { notifyJobOpportunity, notifyMentorshipRequest, notifyMentorshipStatus, notifyAdminAction } = require('../services/notificationService');
 const winston = require('winston');
-const {validate} = require('../middlewares/validate');
-const StudentEngagementTracker = require('../utils/studentEngagement');
+const StudentEngagementTracker = require('../utils/engagement');
 const { logAdminAction } = require('../utils/auditLog');
 
 const logger = winston.createLogger({
@@ -15,23 +14,13 @@ const logger = winston.createLogger({
 });
 
 // This function updates the alumni profile with the provided data
-exports.updateAlumniProfile = 
+exports.updateAlumniProfile =
     async (req, res) => {
         // validating the request body
-    validate([
-        body('profile.graduationYear').optional().isInt({ min: 1960, max: new Date().getFullYear() }),
-        body('profile.industry').optional().trim(),
-        body('profile.expertise').optional().isArray(),
-        body('profile.company').optional().trim(),
-        body('profile.jobTitle').optional().trim(),
-        body('profile.mentorshipAvailability').optional().isBoolean(),
-        body('profile.bio').optional().trim(),
-        body('profile.linkedIn').optional().isURL(),
-    ])
         try {
             const user = await User.findById(req.params.id);
 
-            if(!user) return res.status(404).json({ message: "User Not Found"});
+            if (!user) return res.status(404).json({ message: "User Not Found" });
             if (user.role !== 'alumni') return res.status(403).json({ message: 'Not an alumni' });
 
             Object.assign(user.profile, req.body.profile);
@@ -42,7 +31,7 @@ exports.updateAlumniProfile =
             res.status(500).json({ message: 'Failed to update profile' });
         }
     }
-;
+    ;
 
 // This function helps search for alumni based on various criteria
 // It allows searching by college, department, graduation year, industry, and expertise
@@ -125,9 +114,9 @@ exports.respondConnectionRequest = [
             }
             if (connection.status !== 'pending') {
                 return res.status(400).json({ message: 'Connection already responded' });
-            }            connection.status = req.body.status;
+            } connection.status = req.body.status;
             await connection.save();
-            
+
             // Track student engagement if a student's connection is accepted
             if (req.body.status === 'accepted') {
                 const requester = await User.findById(connection.requester);
@@ -135,7 +124,7 @@ exports.respondConnectionRequest = [
                     await StudentEngagementTracker.incrementAlumniConnection(connection.requester, req.user.id);
                 }
             }
-            
+
             res.json(connection);
         } catch (error) {
             logger.error(`Respond connection error: ${error.message}`);
@@ -161,18 +150,10 @@ exports.getConnections = async (req, res) => {
 
 // This function creates a job opportunity by an admin
 // It validates the input data and saves the job opportunity to the database
-exports.createJobOpportunity = 
-        async (req, res) => {
-            // validating the request body
-    validate([
-        body('title').notEmpty().trim(),
-        body('description').notEmpty().trim(),
-        body('college').optional().trim(),
-        body('department').optional().trim(),
-        body('tags').optional().isArray(),
-        body('applicationLink').optional().trim().isURL(),
-        body('deadline').optional().isISO8601()
-    ])
+exports.createJobOpportunity =
+    async (req, res) => {
+        // validating the request body
+
         try {
             const job = new JobOpportunity({
                 ...req.body,
@@ -189,7 +170,7 @@ exports.createJobOpportunity =
                 details: { title: job.title, updates: req.body },
                 ipAddress: req.ip,
             });
-        
+
             await notifyAdminAction({
                 college: job.college,
                 message: `Job Opportunity "${job.title}" created`,
@@ -202,7 +183,93 @@ exports.createJobOpportunity =
             res.status(500).json({ message: 'Failed to create job opportunity' });
         }
     }
-;
+    ;
+
+    // Update a job opportunity
+exports.updateJobOpportunity = [
+    param('id').isMongoId(),
+    body('title').optional().notEmpty().trim(),
+    body('description').optional().notEmpty().trim(),
+    body('requirements').optional().isArray(),
+    body('location').optional().trim(),
+    body('salary').optional().trim(),
+    body('jobType').optional().isIn(['full-time', 'part-time', 'contract', 'internship']),
+    body('college').optional().isArray(),
+    body('department').optional().isArray(),
+    body('deadline').optional().isISO8601(),
+    body('contactEmail').optional().isEmail(),
+    body('applicationLink').optional().isURL(),
+    body('tags').optional().isArray(),
+    async (req, res) => {
+        try {
+            const job = await JobOpportunity.findById(req.params.id);
+            if (!job) return res.status(404).json({ message: 'Job opportunity not found' });
+
+            // Check if user is authorized to update the job opportunity
+            // Only job creator, college admins of the same college, or system admins can update
+            const isCreator = job.createdBy.toString() === req.user.id;
+            const isCollegeAdmin = req.user.role === 'college_admin' && 
+                                   job.college.includes(req.user.college);
+            const isSystemAdmin = req.user.role === 'system_admin';
+
+            if (!isCreator && !isCollegeAdmin && !isSystemAdmin) {
+                return res.status(403).json({ message: 'Not authorized to update this job opportunity' });
+            }
+
+            // Check if job is still active (can't update closed jobs)
+            if (job.status === 'closed') {
+                return res.status(400).json({ message: 'Cannot update closed job opportunity' });
+            }
+
+            // Store original data for logging
+            const originalData = {
+                title: job.title,
+                description: job.description,
+                location: job.location,
+                deadline: job.deadline
+            };
+
+            // Update job opportunity with provided data
+            Object.assign(job, req.body);
+            job.updatedAt = new Date();
+            
+            await job.save();
+
+            // Notify users about the job opportunity update
+            await notifyJobOpportunity(job);
+
+            // Log the action
+            const logId = await logAdminAction({
+                admin: req.user,
+                action: 'job_opportunity_updated',
+                targetResource: 'JobOpportunity',
+                targetId: job._id,
+                details: { 
+                    title: job.title,
+                    originalData,
+                    updates: req.body,
+                    updatedBy: req.user.id
+                },
+                ipAddress: req.ip,
+            });
+
+            await notifyAdminAction({
+                college: job.college,
+                message: `Job Opportunity "${job.title}" updated by ${req.user.username}`,
+                actionType: 'Job Opportunity Updated',
+                logId,
+            });
+
+            res.json({
+                message: 'Job opportunity updated successfully',
+                job: job
+            });
+        } catch (error) {
+            logger.error(`Update job opportunity error: ${error.message}`);
+            res.status(500).json({ message: 'Failed to update job opportunity' });
+        }
+    },
+];
 
 // close a job opportunity
 exports.closeJobOpportunity = async (req, res) => {
@@ -296,16 +363,16 @@ exports.createMentorshipRequest = [
             });
             if (existingMentorship) {
                 return res.status(400).json({ message: 'Mentorship request already exists' });
-            }            const mentorship = new Mentorship({
+            } const mentorship = new Mentorship({
                 student: req.user.id,
                 mentor: req.params.id,
                 status: 'pending'
             });
             await mentorship.save();
-            
+
             // Track student engagement for mentorship request
             await StudentEngagementTracker.incrementMentorshipRequest(req.user.id, req.params.id);
-            
+
             await notifyMentorshipRequest(mentorship);
             res.status(201).json(mentorship);
         } catch (error) {
@@ -330,14 +397,14 @@ exports.respondMentorshipRequest = [
             }
             if (mentorship.status !== 'pending') {
                 return res.status(400).json({ message: 'Mentorship already responded' });
-            }            mentorship.status = req.body.status;
+            } mentorship.status = req.body.status;
             await mentorship.save();
-            
+
             // Track student engagement if mentorship is accepted
             if (req.body.status === 'accepted') {
                 await StudentEngagementTracker.incrementActiveMentorship(mentorship.student, req.user.id);
             }
-            
+
             await notifyMentorshipStatus(mentorship, req.body.status);
             res.json(mentorship);
         } catch (error) {

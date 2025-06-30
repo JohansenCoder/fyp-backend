@@ -8,19 +8,7 @@ const { logAdminAction } = require('../utils/auditLog');
 //create news (admin only)
 exports.createNews = async (req, res) => {
     // Validate the request body
-    validate([
-        body('headline').notEmpty().trim(),
-        body('content').notEmpty().trim(),
-        body('category').isIn(['sports', 'technology', 'health', 'academics', 'alumni', 'students_life', 'external_partnerships']),
-        body('createdBy').notEmpty().trim(),
-        body('targetRoles').optional().isArray(),
-        body('attachments').optional().isURL(),
-        body('tags').optional().isArray(),
-        body('collegeScope').optional().isArray(),
-        body('isPublished').optional().isBoolean(),
-        body('isArchived').optional().isBoolean(),
-    ])
-    try {
+      try {
         const news = await News.create(req.body);
         // Notify users about the news
         await notifyNews(news);
@@ -86,20 +74,7 @@ exports.getNewsById = async (req, res) => {
 
 // Update news (admin only)
 exports.updateNews = async (req, res) => {
-    // Validate the request body
-    validate([
-        body('headline').optional().notEmpty().trim(),
-        body('content').optional().notEmpty().trim(),
-        body('category').optional().isIn(['sports', 'technology', 'health', 'academics', 'alumni', 'students_life', 'external_partnerships']),
-        body('createdBy').optional().notEmpty().trim(),
-        body('targetRoles').optional().isArray(),
-        body('attachments').optional().isURL(),
-        body('tags').optional().isArray(),
-        body('collegeScope').optional().isArray(),
-        body('isPublished').optional().isBoolean(),
-        body('isArchived').optional().isBoolean(),
-    ])
-   try {
+       try {
     const { id } = req.params;
     const news = await News.findById(id);
     if (!news) {

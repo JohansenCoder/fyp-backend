@@ -35,12 +35,10 @@ router.post(
             .withMessage('Password must be at least 8 characters long'),
         body('role')
             .notEmpty()
-            .isIn(['student', 'staff', 'alumni', 'college_admin','system_admin'])
-            .withMessage('Role must be one of: student, staff, alumni, admin'),
+            .isIn(['student', 'visitor', 'alumni', 'college_admin','system_admin'])
+            .withMessage('Role must be one of: student,visitor, staff, alumni, system_admin, college_admin'),
         body('college')
-            .notEmpty()
-            .isString()
-            .withMessage('College is required'),
+            .isString(),
         body('profile.firstName').optional().trim(),
         body('profile.lastName').optional().trim(),
         body('profile.department').optional().trim(),

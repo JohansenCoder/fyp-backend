@@ -8,21 +8,6 @@ const {logAdminAction} = require('../utils/auditLog');
 // create announcement (admin only)
 exports.createAnnouncement = async (req, res) => {
     // Validate the request body
-    validate([
-        body('title').notEmpty().trim(),
-        body('content').notEmpty().trim(),
-        body('createdBy').notEmpty().trim(),
-        body('targetRoles').optional().isArray(),
-        body('collegeScope').optional().isArray(),
-        body('category').optional().isString(),
-        body('isScheduled').optional().isBoolean(),
-        body('location').optional().isObject(),
-        body('location.coordinates').optional().isArray(),
-        body('location.radius').optional().isNumeric(),
-        body('scheduledAt').optional().isDate(),
-        body('tags').optional().isArray(),
-        body('isPublished').optional().isBoolean()
-    ])
     try {
         const announcement = await Announcement.create(req.body);
 
@@ -99,21 +84,7 @@ exports.getAnnouncementById = async (req, res) => {
 // update announcement (admin only)
 exports.updateAnnouncement = async (req, res) => {
     // Validate the request body
-    validate([
-        body('title').optional().notEmpty().trim(),
-        body('content').optional().notEmpty().trim(),
-        body('createdBy').optional().notEmpty().trim(),
-        body('targetRoles').optional().isArray(),
-        body('collegeScope').optional().isArray(),
-        body('category').optional().isString(),
-        body('isScheduled').optional().isBoolean(),
-        body('location').optional().isObject(),
-        body('location.coordinates').optional().isArray(),
-        body('location.radius').optional().isNumeric(),
-        body('scheduledAt').optional().isDate(),
-        body('tags').optional().isArray(),
-        body('isPublished').optional().isBoolean()
-    ])
+    
     try{
         const { id } = req.params;
     const announcement = await Announcement.findById(id);
