@@ -1,50 +1,59 @@
-const express = require("express");
+const express = require('express');
+const { getAllNews, createNews, getNewsById, updateNews, deleteNews } = require('../controllers/newsController');
+const { authMiddleware, restrictToAdmin } = require ('../middlewares/auth');
+const validate = require('../middlewares/validate');
+const { body } = require ('express-validator');
+
 const router = express.Router();
-const { getAllNews, createNews, getNewsById, updateNews, deleteNews } = require("../controllers/newsController");
-const { authMiddleware, restrictToAdmin } = require("../middlewares/auth");
-const  validate = require('../middlewares/validate');
-const { body } = require('express-validator');
 
+router.post(
+  '/',
+  validate([
+    body('title').notEmpty().trim(),
+    body('content').notEmpty().trim(),
+    body('category').isIn(['sports', 'technology', 'health', 'academics', 'alumni', 'students_life', 'career_fair']),
+    body('targetRoles').isArray().notEmpty(),
+    body('targetRoles.*').isIn(['student', 'visitor', 'alumni']),
+    body('college').isArray().notEmpty(),
+    body('media').optional().isArray(),
+    body('media.*.url').optional().isURL(),
+    body('media.*.type').optional().isIn(['image', 'video']),
+    body('tags').optional().isArray(),
+    body('isPublished').optional().isBoolean(),
+    body('isArchived').optional().isBoolean(),
+    body('scheduledAt').optional().isISO8601(),
+  ]),
+  authMiddleware,
+  restrictToAdmin,
+  createNews
+);
 
-// create news (admin only)
-router.post("/", 
-    validate([
-        body('headline').notEmpty().trim(),
-        body('content').notEmpty().trim(),
-        body('category').isIn(['sports', 'technology', 'health', 'academics', 'alumni', 'students_life', 'external_partnerships']),
-        body('createdBy').notEmpty().trim(),
-        body('targetRoles').optional().isArray(),
-        body('attachments').optional().isURL(),
-        body('tags').optional().isArray(),
-        body('collegeScope').optional().isArray(),
-        body('isPublished').optional().isBoolean(),
-        body('isArchived').optional().isBoolean(),
-    ]),
-    authMiddleware, restrictToAdmin, createNews);
+router.get('/', authMiddleware, getAllNews);
 
-// get all news (public)
-router.get("/", authMiddleware, getAllNews);
+router.get('/:id', authMiddleware, getNewsById);
 
-// get news by ID (public)
-router.get("/:id", authMiddleware, getNewsById);
+router.put(
+  '/:id',
+  validate([
+    body('title').optional().notEmpty().trim(),
+    body('content').optional().notEmpty().trim(),
+    body('category').optional().isIn(['sports', 'technology', 'health', 'academics', 'alumni', 'students_life', 'career_fair']),
+    body('targetRoles').optional().isArray(),
+    body('targetRoles.*').optional().isIn(['student', 'visitor', 'alumni']),
+    body('college').optional().isArray(),
+    body('media').optional().isArray(),
+    body('media.*.url').optional().isURL(),
+    body('media.*.type').optional().isIn(['image', 'video']),
+    body('tags').optional().isArray(),
+    body('isPublished').optional().isBoolean(),
+    body('isArchived').optional().isBoolean(),
+    body('scheduledAt').optional().isISO8601(),
+  ]),
+  authMiddleware,
+  restrictToAdmin,
+  updateNews
+);
 
-// update news (admin only)
-router.put("/:id",
-    validate([
-        body('headline').optional().notEmpty().trim(),
-        body('content').optional().notEmpty().trim(),
-        body('category').optional().isIn(['sports', 'technology', 'health', 'academics', 'alumni', 'students_life', 'external_partnerships']),
-        body('createdBy').optional().notEmpty().trim(),
-        body('targetRoles').optional().isArray(),
-        body('attachments').optional().isURL(),
-        body('tags').optional().isArray(),
-        body('collegeScope').optional().isArray(),
-        body('isPublished').optional().isBoolean(),
-        body('isArchived').optional().isBoolean(),
-    ]),
-     authMiddleware, restrictToAdmin, updateNews);
-
-// delete news (admin only)
-router.delete("/:id", authMiddleware, restrictToAdmin, deleteNews);
+router.delete('/:id', authMiddleware, restrictToAdmin, deleteNews);
 
 module.exports = router;

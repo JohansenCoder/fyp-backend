@@ -1,7 +1,7 @@
 const express = require('express');
 const { updateAlumniProfile,searchAlumni,createConnectionRequest,respondConnectionRequest,getConnections,
         createJobOpportunity,getJobOpportunities,searchMentors,createMentorshipRequest,
-        respondMentorshipRequest, closeJobOpportunity , updateJobOpportunity} = require('../controllers/alumniController');
+        respondMentorshipRequest, handleStatusChange , updateJobOpportunity} = require('../controllers/alumniController');
 const {authMiddleware,restrictToAdmin, restrictToAlumni, restrictToStudent} = require('../middlewares/auth');
 const router = express.Router();
 const validate = require('../middlewares/validate');
@@ -38,18 +38,45 @@ router.post('/jobs',
     validate([
         body('title').notEmpty().trim(),
         body('description').notEmpty().trim(),
-        body('college').optional().trim(),
+        body('company').notEmpty().trim(),
+        body('location').notEmpty().trim(),
         body('department').optional().trim(),
         body('tags').optional().isArray(),
         body('applicationLink').optional().trim().isURL(),
-        body('deadline').optional().isISO8601()
+        body('deadline').notEmpty().isISO8601(),
+        body('contactEmail').notEmpty().isEmail().trim(),
+        body('contactPhone').optional().isString().trim(),
+        body('type').notEmpty().isIn(['full-time', 'part-time', 'contract']),
+        body('requirements').optional().isArray(),
+        body('responsibilities').optional().isArray(),
+        body('createdBy').notEmpty().isMongoId(),
+        body('status').optional().isIn(['active', 'closed']),
+        body('createdAt').optional().isISO8601(),
     ]),
      authMiddleware, restrictToAdmin, createJobOpportunity);
 
 // allows admin to update a job Opportunity
-router.put('/jobs/:id', updateJobOpportunity);
+router.put('/jobs/:id',
+    validate([
+        body('title').optional().notEmpty().trim(),
+        body('description').optional().notEmpty().trim(),
+        body('company').optional().notEmpty().trim(),
+        body('location').optional().notEmpty().trim(),
+        body('department').optional().trim(),
+        body('tags').optional().isArray(),
+        body('applicationLink').optional().trim().isURL(),
+        body('deadline').optional().isISO8601(),
+        body('contactEmail').optional().isEmail().trim(),
+        body('contactPhone').optional().isString().trim(),
+        body('type').optional().isIn(['full-time', 'part-time', 'contract']),
+        body('requirements').optional().isArray(),
+        body('responsibilities').optional().isArray(),
+        body('status').optional().isIn(['active', 'closed']),   
+    ]),
+authMiddleware, restrictToAdmin,
+     updateJobOpportunity);
 // allows admins to close a job opportunity
-router.put('/jobs/:id', authMiddleware, restrictToAdmin, closeJobOpportunity);
+router.patch('/jobs/:id/status', authMiddleware, restrictToAdmin, handleStatusChange); 
 
 // allows alumni & admin to view tye posted job opportunities
 router.get('/jobs', authMiddleware, getJobOpportunities);

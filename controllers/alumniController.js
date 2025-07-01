@@ -8,6 +8,8 @@ const { notifyJobOpportunity, notifyMentorshipRequest, notifyMentorshipStatus, n
 const winston = require('winston');
 const StudentEngagementTracker = require('../utils/engagement');
 const { logAdminAction } = require('../utils/auditLog');
+const jwt = require('jsonwebtoken');
+
 
 const logger = winston.createLogger({
     transports: [new winston.transports.Console()],
@@ -150,8 +152,7 @@ exports.getConnections = async (req, res) => {
 
 // This function creates a job opportunity by an admin
 // It validates the input data and saves the job opportunity to the database
-exports.createJobOpportunity =
-    async (req, res) => {
+exports.createJobOpportunity =async (req, res) => {
         // validating the request body
 
         try {
@@ -182,120 +183,115 @@ exports.createJobOpportunity =
             logger.error(`Create job opportunity error: ${error.message}`);
             res.status(500).json({ message: 'Failed to create job opportunity' });
         }
-    }
-    ;
+ };
 
     // Update a job opportunity
 exports.updateJobOpportunity = [
     param('id').isMongoId(),
-    body('title').optional().notEmpty().trim(),
-    body('description').optional().notEmpty().trim(),
-    body('requirements').optional().isArray(),
-    body('location').optional().trim(),
-    body('salary').optional().trim(),
-    body('jobType').optional().isIn(['full-time', 'part-time', 'contract', 'internship']),
-    body('college').optional().isArray(),
-    body('department').optional().isArray(),
-    body('deadline').optional().isISO8601(),
-    body('contactEmail').optional().isEmail(),
-    body('applicationLink').optional().isURL(),
-    body('tags').optional().isArray(),
     async (req, res) => {
         try {
+            // DEBUG: Start updateJobOpportunity
+            const token = req.headers.authorization?.split(' ')[1];
+            if (!token) {
+                return res.status(401).json({ message: 'No token provided' });
+            }
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            if (decoded.role !== 'system_admin') {
+                return res.status(403).json({ message: 'Only system admin can update job opportunities' });
+            }
+
             const job = await JobOpportunity.findById(req.params.id);
-            if (!job) return res.status(404).json({ message: 'Job opportunity not found' });
-
-            // Check if user is authorized to update the job opportunity
-            // Only job creator, college admins of the same college, or system admins can update
-            const isCreator = job.createdBy.toString() === req.user.id;
-            const isCollegeAdmin = req.user.role === 'college_admin' && 
-                                   job.college.includes(req.user.college);
-            const isSystemAdmin = req.user.role === 'system_admin';
-
-            if (!isCreator && !isCollegeAdmin && !isSystemAdmin) {
-                return res.status(403).json({ message: 'Not authorized to update this job opportunity' });
+            if (!job) {
+                return res.status(404).json({ message: 'Job opportunity not found' });
             }
 
-            // Check if job is still active (can't update closed jobs)
-            if (job.status === 'closed') {
-                return res.status(400).json({ message: 'Cannot update closed job opportunity' });
-            }
+            // Update top-level fields
+            const updatableFields = [
+                'title', 'description', 'college', 'department', 'industry',
+                'location', 'deadline', 'status', 'requirements', 'salary', 'type'
+            ];
+            updatableFields.forEach(field => {
+                if (req.body[field] !== undefined) {
+                    job[field] = req.body[field];
+                }
+            });
 
-            // Store original data for logging
-            const originalData = {
-                title: job.title,
-                description: job.description,
-                location: job.location,
-                deadline: job.deadline
-            };
-
-            // Update job opportunity with provided data
-            Object.assign(job, req.body);
-            job.updatedAt = new Date();
-            
+            // Save job
             await job.save();
-
-            // Notify users about the job opportunity update
-            await notifyJobOpportunity(job);
 
             // Log the action
             const logId = await logAdminAction({
                 admin: req.user,
-                action: 'job_opportunity_updated',
+                action: 'job opportunity updated',
                 targetResource: 'JobOpportunity',
                 targetId: job._id,
-                details: { 
-                    title: job.title,
-                    originalData,
-                    updates: req.body,
-                    updatedBy: req.user.id
-                },
+                details: { updates: req.body },
                 ipAddress: req.ip,
             });
 
             await notifyAdminAction({
                 college: job.college,
-                message: `Job Opportunity "${job.title}" updated by ${req.user.username}`,
+                message: `Job Opportunity "${job.title}" updated`,
                 actionType: 'Job Opportunity Updated',
                 logId,
             });
 
-            res.json({
-                message: 'Job opportunity updated successfully',
-                job: job
-            });
+            res.json({ message: 'Job opportunity updated successfully', job });
         } catch (error) {
-            logger.error(`Update job opportunity error: ${error.message}`);
-            res.status(500).json({ message: 'Failed to update job opportunity' });
+            logger.error('Error in updateJobOpportunity', { message: error.message, stack: error.stack });
+            res.status(500).json({ message: 'Failed to update job opportunity', error: error.message });
         }
-    },
+    }
 ];
 
-// close a job opportunity
-exports.closeJobOpportunity = async (req, res) => {
+// This function handles the status change of a job opportunity
+exports.handleStatusChange = async (req, res) => {
     try {
         const job = await JobOpportunity.findById(req.params.id);
         if (!job) return res.status(404).json({ message: 'Job opportunity not found' });
-        job.status = 'closed';
+
+        // Only allow status change between 'active' and 'closed'
+        const { status } = req.body;
+        if (!['active', 'closed'].includes(status)) {
+            return res.status(400).json({ message: 'Invalid status. Only "active" or "closed" allowed.' });
+        }
+
+        // Prevent redundant updates
+        if (job.status === status) {
+            return res.status(400).json({ message: `Job opportunity is already ${status}` });
+        }
+
+        // Only allow closing if currently active, and reopening if currently closed
+        if (job.status === 'active' && status === 'closed') {
+            job.status = 'closed';
+        } else if (job.status === 'closed' && status === 'active') {
+            job.status = 'active';
+        } else {
+            return res.status(400).json({ message: 'Invalid status transition' });
+        }
+
         await job.save();
         await notifyJobOpportunity(job);
+
         // Log the action
         const logId = await logAdminAction({
             admin: req.user,
-            action: 'job opportunity closed',
+            action: `job opportunity ${status}`,
             targetResource: 'JobOpportunity',
             targetId: job._id,
         });
+
         await notifyAdminAction({
             college: job.college,
-            message: `Job Opportunity "${job.title}" closed`,
-            actionType: 'Job Opportunity Closed',
+            message: `Job Opportunity "${job.title}" ${status}`,
+            actionType: `Job Opportunity ${status.charAt(0).toUpperCase() + status.slice(1)}`,
             logId,
         });
+
         res.json(job);
     } catch (error) {
-        logger.error(`Close job opportunity error: ${error.message}`);
-        res.status(500).json({ message: 'Failed to close job opportunity' });
+        logger.error(`Change job opportunity status error: ${error.message}`);
+        res.status(500).json({ message: 'Failed to change job opportunity status' });
     }
 };
 
@@ -311,7 +307,7 @@ exports.getJobOpportunities = async (req, res) => {
         if (college) query.college = college;
         if (department) query.department = department;
 
-        const jobs = await JobOpportunity.find(query).populate('createdBy', 'username');
+        const jobs = await JobOpportunity.find();
         res.json(jobs);
     } catch (error) {
         logger.error(`Get job opportunities error: ${error.message}`);

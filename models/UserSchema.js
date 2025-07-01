@@ -28,7 +28,13 @@ const userSchema = new mongoose.Schema({
     department: { type: String },
     graduationYear: { type: Number},
     registrationNumber: { type: String}, // Optional for visitors
-    location: { type: String },
+    location: {
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+      index: '2dsphere'
+    },
+    radius: { type: Number, default: 1000 } // Default 1km radius
+  },
     phone: { type: String },
     bio: { type: String },
     profilePicture: { type: String },

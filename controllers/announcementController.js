@@ -1,151 +1,180 @@
 const Announcement = require('../models/AnnouncementSchema');
-const { validate } = require('../models/FailedAttemptSchema');
 const User = require('../models/UserSchema');
-const { notifyAnnouncement, notifyAdminAction } = require('../services/notificationService');    
-const {logAdminAction} = require('../utils/auditLog');
+const { notifyAnnouncement, notifyAdminAction } = require('../services/notificationService');
+const { logAdminAction } = require('../utils/auditLog');
 
-
-// create announcement (admin only)
 exports.createAnnouncement = async (req, res) => {
-    // Validate the request body
-    try {
-        const announcement = await Announcement.create(req.body);
+  try {
+    const announcement = await Announcement.create({
+      ...req.body,
+      createdBy: req.user.id
+    });
 
-        const logId = await logAdminAction({
-            admin: req.user,
-            action: 'announcement_created',
-            targetResource: 'announcement',
-            targetId: announcement._id,
-            details: { title: announcement.title, college: announcement.college },
-            ipAddress: req.ip,
-        });
+    const logId = await logAdminAction({
+      admin: req.user,
+      action: 'announcement_created',
+      targetResource: 'announcement',
+      targetId: announcement._id,
+      details: { title: announcement.title, college: announcement.college },
+      ipAddress: req.ip,
+    });
 
-        await notifyAnnouncement(announcement);
-        // Notify admin about the announcement creation
-        await notifyAdminAction({
-            college: announcement.college,
-            message: `Announcement "${announcement.title}" created`,
-            actionType: 'Announcement Creation',
-            logId,
-        });
-        // Notify users about the announcement
-        await notifyAnnouncement(announcement);
-        return res.status(201).json({
-            message: "Announcement created successfully",
-            announcement: announcement
-        });
-    } catch (err) {
-        return res.status(500).json({ message: "Error creating announcement", error: err.message });
-    }
-}
+    await notifyAnnouncement(announcement);
+    await notifyAdminAction({
+      college: announcement.college,
+      message: `Announcement "${announcement.title}" created`,
+      actionType: 'Announcement Creation',
+      logId,
+    });
 
-// get all announcements 
+    return res.status(201).json({
+      message: "Announcement created successfully",
+      announcement
+    });
+  } catch (err) {
+    return res.status(500).json({ message: "Error creating announcement", error: err.message });
+  }
+};
+
 exports.getAllAnnouncements = async (req, res) => {
-    try {
-        const user = await User.findById(req.user.userId);
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-        if(!user) return res.status(404).json({ message: "User not Found."})
-        const query = {
-            isPublished: true,
-            $or: [
-                { collegeScope: { $in: [user.college] } },
-                { tags: { $in: user.interests } }
-            ]
-        };
-        const announcements = await Announcement.find(query);
-        res.status(200).json({
-            message: "Announcements fetched successfully",
-            announcements: announcements
-        });
-    } catch (error) {
-        return res.status(500).json({ message: "Error fetching announcements", error: error.message });
+    let query = {
+      
+      expiresAt: { $gt: new Date() } // Only active announcements
+    };
+
+    // If user is not an admin, apply filtering based on role, college, location, and visibility
+    if (user.role === 'college_admin') {
+      query = {
+        ...query,
+        college: user.college
+      };
+    } else if (user.role !== 'system_admin') {
+      query = {
+        ...query,
+        $or: [
+          // Role and college-based announcements
+          {
+            targetRoles: user.role,
+            college: { $in: [user.college] }
+          },
+          // Emergency announcements based on location
+          {
+            category: 'emergency',
+            'location.coordinates': {
+              $geoWithin: {
+                $centerSphere: [
+                  user.location?.coordinates || [0, 0], // [longitude, latitude]
+                  (user.location?.radius || 1000) / 6378100 // Default 1km radius, converted to radians
+                ]
+              }
+            }
+          },
+          // Public announcements matching user interests
+          {
+            visibility: 'public',
+            tags: { $in: user.interests || [] }
+          }
+        ]
+      };
     }
-}
 
+    const announcements = await Announcement.find(query)
+      .populate('createdBy', 'name')
+      .sort({ createdAt: -1 });
 
+    res.status(200).json({
+      message: "Announcements fetched successfully",
+      announcements
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching announcements", error: error.message });
+  }
+};
 
 exports.getAnnouncementById = async (req, res) => {
-   try {
+  try {
+    const { id } = req.params;
+    const announcement = await Announcement.findById(id).populate('createdBy', 'name');
+    if (!announcement) {
+      return res.status(404).json({ message: "Announcement not found" });
+    }
+    res.status(200).json({
+      message: "Announcement fetched successfully",
+      announcement
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching announcement", error: error.message });
+  }
+};
+
+exports.updateAnnouncement = async (req, res) => {
+  try {
     const { id } = req.params;
     const announcement = await Announcement.findById(id);
     if (!announcement) {
-        return res.status(404).json({ message: "Announcement not found" });
+      return res.status(404).json({ message: "Announcement not found" });
     }
-    res.status(200).json({
-        message: "Announcement fetched successfully",
-        announcement: announcement
-    }); 
-   }
-   catch (error) {
-    return res.status(500).json({ message: "Error fetching announcement", error: error.message });
-   }
-}
+    const updatedAnnouncement = await Announcement.findByIdAndUpdate(id, {
+      ...req.body,
+      updatedAt: new Date()
+    }, { new: true });
 
-// update announcement (admin only)
-exports.updateAnnouncement = async (req, res) => {
-    // Validate the request body
-    
-    try{
-        const { id } = req.params;
-    const announcement = await Announcement.findById(id);
-    if (!announcement) {
-        return res.status(404).json({ message: "Announcement not found" });
-    }
-    await Announcement.findByIdAndUpdate(id, req.body);
     const logId = await logAdminAction({
-        admin: req.user,
-        action: 'announcement_updated',
-        targetResource: 'announcement',
-        targetId: announcement._id,
-        details: { title: announcement.title, updates: req.body },
-        ipAddress: req.ip,
+      admin: req.user,
+      action: 'announcement_updated',
+      targetResource: 'announcement',
+      targetId: announcement._id,
+      details: { title: announcement.title, updates: req.body },
+      ipAddress: req.ip,
     });
 
     await notifyAdminAction({
-        college: announcement.college,
-        message: `Announcement "${announcement.title}" updated`,
-        actionType: 'Announcement Update',
-        logId,
+      college: announcement.college,
+      message: `Announcement "${announcement.title}" updated`,
+      actionType: 'Announcement Update',
+      logId,
     });
-    res.status(200).json({ message: "Announcement updated successfully" });
-    }
-    catch (err) {
-        return res.status(500).json({ message: "Error updating announcement", error: err.message });
-    }
-}
+
+    res.status(200).json({
+      message: "Announcement updated successfully",
+      announcement: updatedAnnouncement
+    });
+  } catch (err) {
+    return res.status(500).json({ message: "Error updating announcement", error: err.message });
+  }
+};
 
 exports.deleteAnnouncement = async (req, res) => {
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
     const announcement = await Announcement.findById(id);
     if (!announcement) {
-        return res.status(404).json({ message: "Announcement not found" });
-    }   
+      return res.status(404).json({ message: "Announcement not found" });
+    }
     await Announcement.findByIdAndDelete(id);
 
     const logId = await logAdminAction({
-        admin: req.user,
-        action: 'announcement_deleted',
-        targetResource: 'announcement',
-        targetId: req.params.id,
-        details: { title: announcement.title },
-        ipAddress: req.ip,
+      admin: req.user,
+      action: 'announcement_deleted',
+      targetResource: 'announcement',
+      targetId: id,
+      details: { title: announcement.title },
+      ipAddress: req.ip,
     });
 
     await notifyAdminAction({
-        college: announcement.college,
-        message: `Announcement "${announcement.title}" deleted`,
-        actionType: 'Announcement Deletion',
-        logId,
+      college: announcement.college,
+      message: `Announcement "${announcement.title}" deleted`,
+      actionType: 'Announcement Deletion',
+      logId,
     });
+
     res.status(200).json({ message: "Announcement deleted successfully" });
-    }
-    catch (err) {
-        return res.status(500).json({ message: "Error deleting announcement", error: err.message });
-    }
-}
-
-
-
-
-
+  } catch (err) {
+    return res.status(500).json({ message: "Error deleting announcement", error: err.message });
+  }
+};

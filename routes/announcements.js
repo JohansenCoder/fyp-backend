@@ -19,7 +19,7 @@ router.post("/",
         body('location').optional().isObject(),
         body('location.coordinates').optional().isArray(),
         body('location.radius').optional().isNumeric(),
-        body('scheduledAt').optional().isDate(),
+        
         body('tags').optional().isArray(),
         body('isPublished').optional().isBoolean()
     ]),

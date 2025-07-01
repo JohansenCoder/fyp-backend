@@ -1,142 +1,144 @@
 const News = require('../models/NewsSchema');
-const {notifyNews} = require('../services/notificationService');
+const { notifyNews, notifyAdminAction } = require('../services/notificationService');
 const User = require('../models/UserSchema');
-const { body } = require('express-validator');
-const { validate } = require('../middlewares/validate');
 const { logAdminAction } = require('../utils/auditLog');
 
-//create news (admin only)
 exports.createNews = async (req, res) => {
-    // Validate the request body
-      try {
-        const news = await News.create(req.body);
-        // Notify users about the news
-        await notifyNews(news);
-        // Log the admin action
-        const logId = await logAdminAction({
-            admin: req.user,
-            action: 'news_created',
-            targetResource: 'news',
-            targetId: news._id,
-            details: { title: news.title, college: news.college },
-            ipAddress: req.ip,
-        });
-        // Notify admin about the news creation
-        await notifyAdminAction({
-            college: news.college,
-            message: `News "${news.title}" created`,
-            actionType: 'News Creation',
-            logId,
-        });
-        return res.status(201).json({
-            message: "News article created successfully",
-            news: news
-        });
-    } catch (err) {
-        return res.status(500).json({ message: "Error creating news", error: err.message });
-    }
-}
+  try {
+    const news = await News.create({
+      ...req.body,
+      createdBy: req.user.id,
+      updatedAt: new Date()
+    });
+    await notifyNews(news);
+    const logId = await logAdminAction({
+      admin: req.user,
+      action: 'news_created',
+      targetResource: 'news',
+      targetId: news._id,
+      details: { title: news.title, college: news.college },
+      ipAddress: req.ip,
+    });
+    await notifyAdminAction({
+      college: news.college,
+      message: `News "${news.title}" created`,
+      actionType: 'News Creation',
+      logId,
+    });
+    return res.status(201).json({
+      message: "News article created successfully",
+      news
+    });
+  } catch (err) {
+    return res.status(500).json({ message: "Error creating news", error: err.message });
+  }
+};
 
-// Get all news for the user
-// This will be used to fetch news relevant to the user
 exports.getAllNews = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
 
-    try {
-        const user = await User.findById(req.user.userId);
-        const query = {
-            isPublished: true,
-            $or: [
-                { collegeScope: { $in: [user.college] } },
-                { tags: { $in: user.interests } }
-            ]
-        };
-        const news = await News.find(query);
-        res.status(200).json({
-            message: "News fetched successfully",
-            news: news
-        });
-    } catch (error) {
-        return res.status(500).json({ message: "Error fetching news", error: error.message });
+    let query 
+
+    if (user.role === "system_admin") {
+      // No additional filters, system admin sees all news
+    } else if (user.role === "college_admin") {
+      // Only filter by college for college admin
+      query.college = user.college;
+    } else {
+      // Regular user filters
+      query.$or = [
+        { college: { $in: [user.college] } },
+        { targetRoles: user.role },
+        { tags: { $in: user.interests } }
+      ];
     }
-}
-// Get news by ID
+
+    const news = await News.find(query).sort({ createdAt: -1 });
+    res.status(200).json({
+      message: "News fetched successfully",
+      news
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching news", error: error.message });
+  }
+};
+
 exports.getNewsById = async (req, res) => {
+  try {
     const { id } = req.params;
     const news = await News.findById(id);
     if (!news) {
-        return res.status(404).json({ message: "News not found" });
+      return res.status(404).json({ message: "News not found" });
     }
     res.status(200).json({
-        message: "News fetched successfully",
-        news: news
-    }); 
-}
+      message: "News fetched successfully",
+      news
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Error fetching news", error: error.message });
+  }
+};
 
-// Update news (admin only)
 exports.updateNews = async (req, res) => {
-       try {
+  try {
     const { id } = req.params;
     const news = await News.findById(id);
     if (!news) {
-        return res.status(404).json({ message: "News not found" });
+      return res.status(404).json({ message: "News not found" });
     }
-    await News.findByIdAndUpdate(id, req.body);
-    // log the admin action
+    const updatedNews = await News.findByIdAndUpdate(
+      id,
+      { ...req.body, updatedAt: new Date() },
+      { new: true }
+    );
     const logId = await logAdminAction({
-        admin: req.user,
-        action: 'news_updated',
-        targetResource: 'news',
-        targetId: news._id,
-        details: { title: news.title, updates: req.body },
-        ipAddress: req.ip,
+      admin: req.user,
+      action: 'news_updated',
+      targetResource: 'news',
+      targetId: news._id,
+      details: { title: news.title, updates: req.body },
+      ipAddress: req.ip,
     });
-    // Notify admin about the news update
     await notifyAdminAction({
-        college: news.college,
-        message: `News "${news.title}" updated`,
-        actionType: 'News Update',
-        logId,
+      college: news.college,
+      message: `News "${news.title}" updated`,
+      actionType: 'News Update',
+      logId,
     });
-    res.status(200).json({ message: "News updated successfully" });
-   }
-   catch (error) {
+    res.status(200).json({
+      message: "News updated successfully",
+      news: updatedNews
+    });
+  } catch (error) {
     return res.status(500).json({ message: "Error updating news", error: error.message });
-   }
-}
+  }
+};
 
-// Delete news (admin only)
 exports.deleteNews = async (req, res) => {
   try {
     const { id } = req.params;
     const news = await News.findById(id);
     if (!news) {
-        return res.status(404).json({ message: "News not found" });
-    }   
+      return res.status(404).json({ message: "News not found" });
+    }
     await News.findByIdAndDelete(id);
-    // log the admin action
     const logId = await logAdminAction({
-        admin: req.user,
-        action: 'news_deleted',
-        targetResource: 'news',
-        targetId: req.params.id,
-        details: { title: news.title },
-        ipAddress: req.ip,
+      admin: req.user,
+      action: 'news_deleted',
+      targetResource: 'news',
+      targetId: news._id,
+      details: { title: news.title },
+      ipAddress: req.ip,
     });
-    // Notify admin about the news deletion
     await notifyAdminAction({
-        college: news.college,
-        message: `News "${news.title}" deleted`,
-        actionType: 'News Deletion',
-        logId,
+      college: news.college,
+      message: `News "${news.title}" deleted`,
+      actionType: 'News Deletion',
+      logId,
     });
     res.status(200).json({ message: "News deleted successfully" });
-  }
-  catch (error) {
+  } catch (error) {
     return res.status(500).json({ message: "Error deleting news", error: error.message });
   }
-}
-
-
-
-
-
+};

@@ -110,20 +110,40 @@ exports.getUserById = async (req, res) => {
 }
 
 
-exports.updateUser = async (req, res) => {
+exports.updateUser =
+ async (req, res) => {
     try {
+        console.log('DEBUG: Starting updateUser', { userId: req.params.id, body: req.body });
+
         const { profile } = req.body;
-        // role should be obtained from the token
-        const token = req.headers.authorization.split(' ')[1];
+
+        // Verify JWT token
+        console.log('DEBUG: Verifying JWT token');
+        const token = req.headers.authorization?.split(' ')[1];
+        if (!token) {
+            console.log('DEBUG: No token provided');
+            return res.status(401).json({ message: 'No token provided' });
+        }
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        console.log('DEBUG: Token verified', { role: decoded.role });
+
+        // Check role
         const role = decoded.role;
+        if (role !== 'system_admin') {
+            console.log('DEBUG: Unauthorized role', { role });
+            return res.status(403).json({ message: 'Only system admin can update user' });
+        }
+
+        // Find user
+        console.log('DEBUG: Finding user by ID', { userId: req.params.id });
         const user = await User.findById(req.params.id);
         if (!user) {
+            console.log('DEBUG: User not found', { userId: req.params.id });
             return res.status(404).json({ message: 'User not found' });
         }
-        if (role !== 'system_admin') {
-            return res.status(403).json({ message: 'Only system admin can update role' });
-        }
+
+        // Update top-level fields
+        console.log('DEBUG: Updating top-level fields');
         if (req.body.role) {
             user.role = req.body.role;
         }
@@ -136,7 +156,13 @@ exports.updateUser = async (req, res) => {
         if (req.body.college) {
             user.college = req.body.college;
         }
+        if (req.body.isActive !== undefined) {
+            user.isActive = req.body.isActive;
+        }
+
+        // Update profile fields
         if (profile) {
+            console.log('DEBUG: Updating profile fields', { profile });
             user.profile = {
                 ...user.profile,
                 firstName: profile.firstName || user.profile.firstName,
@@ -153,34 +179,48 @@ exports.updateUser = async (req, res) => {
                 company: profile.company || user.profile.company,
                 jobTitle: profile.jobTitle || user.profile.jobTitle,
                 registrationNumber: profile.registrationNumber || user.profile.registrationNumber,
-                mentorshipAvailability: profile.mentorshipAvailability !== undefined ? profile.mentorshipAvailability : user
+                mentorshipAvailability:
+                    profile.mentorshipAvailability !== undefined
+                        ? profile.mentorshipAvailability
+                        : user.profile.mentorshipAvailability,
+                notificationPreferences: profile.notificationPreferences
+                    ? {
+                          ...user.profile.notificationPreferences,
+                          ...profile.notificationPreferences,
+                      }
+                    : user.profile.notificationPreferences,
             };
         }
+
         // Hash password if provided
         if (req.body.password) {
+            console.log('DEBUG: Hashing password');
             const hashedPassword = await bcrypt.hash(req.body.password, 10);
             user.password = hashedPassword;
         }
-        // Update other fields if any
-        if (req.body.notificationPreferences) {
-            user.notificationPreferences = {
-                ...user.notificationPreferences,
-                ...req.body.notificationPreferences,
-            };
-        }
+
+        // Update other fields
         if (req.body.interests) {
+            console.log('DEBUG: Updating interests', { interests: req.body.interests });
             user.interests = req.body.interests;
         }
         if (req.body.fcmTokens) {
+            console.log('DEBUG: Updating fcmTokens', { fcmTokens: req.body.fcmTokens });
             user.fcmTokens = req.body.fcmTokens;
         }
-        Object.assign(user); // Update other fields if any
-        await user.save();
 
-        
+        // Save user
+        console.log('DEBUG: Saving user');
+        await user.save();
+        console.log('DEBUG: User saved successfully', { userId: user._id });
 
         res.json({ message: 'User updated successfully', user });
     } catch (error) {
+        console.error('DEBUG: Error in updateUser', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name,
+        });
         res.status(500).json({ message: 'Failed to update user', error: error.message });
     }
 };
