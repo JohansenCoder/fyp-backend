@@ -36,31 +36,41 @@ exports.createNews = async (req, res) => {
 
 exports.getAllNews = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user?.id);
+    
+    // Validate user
+    if (!user) {
+      return res.status(401).json({ message: 'User not found or unauthorized' });
+    }
 
-    let query 
+    // Initialize query object
+    const query = {
+      isPublished: true,
+      isArchived: false,
+    };
 
-    if (user.role === "system_admin") {
-      // No additional filters, system admin sees all news
-    } else if (user.role === "college_admin") {
-      // Only filter by college for college admin
+    if (user.role === 'system_admin') {
+      // No additional filters, system admin sees all active news
+    } else if (user.role === 'college_admin') {
+      // Filter by college for college admin
       query.college = user.college;
     } else {
       // Regular user filters
       query.$or = [
         { college: { $in: [user.college] } },
         { targetRoles: user.role },
-        { tags: { $in: user.interests } }
+        { tags: { $in: user.interests || [] } }, // Handle undefined interests
       ];
     }
 
-    const news = await News.find(query).sort({ createdAt: -1 });
+    const news = await News.find(query).sort({ createdAt: -1 }).lean();
     res.status(200).json({
-      message: "News fetched successfully",
-      news
+      message: 'News fetched successfully',
+      news,
     });
   } catch (error) {
-    return res.status(500).json({ message: "Error fetching news", error: error.message });
+    console.error('Error fetching news:', error);
+    return res.status(500).json({ message: 'Error fetching news', error: error.message });
   }
 };
 
@@ -142,3 +152,76 @@ exports.deleteNews = async (req, res) => {
     return res.status(500).json({ message: "Error deleting news", error: error.message });
   }
 };
+
+exports.toggleArchiveNews = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const news = await News.findById(id);
+    if (!news) {
+      return res.status(404).json({ message: "News not found" });
+    }
+    const isArchived = !news.isArchived;
+    const updatedNews = await News.findByIdAndUpdate(
+      id,
+      { isArchived, updatedAt: new Date() },
+      { new: true }
+    );
+    const logId = await logAdminAction({
+      admin: req.user,
+      action: isArchived ? 'news_archived' : 'news_unarchived',
+      targetResource: 'news',
+      targetId: news._id,
+      details: { title: news.title, isArchived },
+      ipAddress: req.ip,
+    });
+    await notifyAdminAction({
+      college: news.college,
+      message: `News "${news.title}" ${isArchived ? 'archived' : 'unarchived'}`,
+      actionType: isArchived ? 'News Archival' : 'News Unarchival',
+      logId,
+    });
+    res.status(200).json({
+      message: `News ${isArchived ? 'archived' : 'unarchived'} successfully`,
+      news: updatedNews
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Error toggling archive status", error: error.message });
+  }
+}
+
+exports.togglePublishNews = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const news = await News.findById(id);
+    if (!news) {
+      return res.status(404).json({ message: "News not found" });
+    }
+    const isPublished = !news.isPublished;
+    const updatedNews = await News.findByIdAndUpdate(
+      id,
+      { isPublished, updatedAt: new Date() },
+      { new: true }
+    );
+    const logId = await logAdminAction({
+      admin: req.user,
+      action: isPublished ? 'news_published' : 'news_unpublished',
+      targetResource: 'news',
+      targetId: news._id,
+      details: { title: news.title, isPublished },
+      ipAddress: req.ip,
+    });
+    await notifyAdminAction({
+      college: news.college,
+      message: `News "${news.title}" ${isPublished ? 'published' : 'unpublished'}`,
+      actionType: isPublished ? 'News Publication' : 'News Unpublication',
+      logId,
+    });
+    res.status(200).json({
+      message: `News ${isPublished ? 'published' : 'unpublished'} successfully`,
+      news: updatedNews
+    });
+  }
+  catch (error) {
+    return res.status(500).json({ message: "Error toggling publish status", error: error.message });
+  }
+}

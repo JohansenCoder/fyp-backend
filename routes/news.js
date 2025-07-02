@@ -1,5 +1,5 @@
 const express = require('express');
-const { getAllNews, createNews, getNewsById, updateNews, deleteNews } = require('../controllers/newsController');
+const { getAllNews, createNews, getNewsById, updateNews, deleteNews,toggleArchiveNews, togglePublishNews } = require('../controllers/newsController');
 const { authMiddleware, restrictToAdmin } = require ('../middlewares/auth');
 const validate = require('../middlewares/validate');
 const { body } = require ('express-validator');
@@ -55,5 +55,19 @@ router.put(
 );
 
 router.delete('/:id', authMiddleware, restrictToAdmin, deleteNews);
+
+router.patch(
+  '/:id/archive',
+  authMiddleware,
+  restrictToAdmin,
+  toggleArchiveNews
+);
+
+router.patch(
+  '/:id/publish',
+  authMiddleware,
+  restrictToAdmin,
+  togglePublishNews
+);
 
 module.exports = router;

@@ -8,6 +8,9 @@ const dynamicEventSchema = new mongoose.Schema({
   contactEmail: { type: String }, // Use String for email
   contactPhone: { type: String}, // Use String for phone number
   date: { type: Date }, // Use Date type for date
+  targetRoles: [
+    { type: String, enum: ['student', 'visitor', 'alumni'], required: true },
+  ],
   startTime: { type: String}, // Use String for time (HH:mm format)
    // Use String for time (HH:mm format)
     media: [

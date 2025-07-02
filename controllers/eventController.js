@@ -107,16 +107,51 @@ exports.createDynamicEvent = [
 exports.getDynamicEvents = async (req, res) => {
   try {
     console.log('Getting events for user:', req.user); // Debug log
-    const user = await User.findById(req.user.id); // Changed from req.user.userId to req.user.id
+    const user = await User.findById(req.user.id);
 
     if (!user) return res.status(404).json({ message: "User not found" });
-    const query = {
-      status: 'active',
+    
+    let query = {};
 
-    };
-    const events = await DynamicEvent.find(query);
+    // Apply filters based on user role
+    if (user.role === 'system_admin') {
+      // System admin can see all events regardless of status or college
+      // No filters applied
+      console.log('System admin - fetching all events');
+    } else if (user.role === 'college_admin') {
+      // College admin can see all events in their college regardless of status
+      query.college = { $in: [user.college] }; // Handle both string and array college fields
+      console.log('College admin - fetching events for college:', user.college);
+    } else {
+      // Regular users (students, alumni, etc.) can only see active events
+      // and only events relevant to their college
+      query.status = 'active';
+      query.college = { $in: [user.college] }; // Handle both string and array college fields
+      console.log('Regular user - fetching active events for college:', user.college);
+    }
+
+    const events = await DynamicEvent.find(query)
+      .populate('createdBy', 'firstName lastName email role')
+      .sort({ startDate: 1 }); // Sort by start date
+
+    // Add additional info for each event
+    const eventsWithDetails = events.map(event => ({
+      ...event.toObject(),
+      totalAttendees: event.Attendees ? event.Attendees.length : 0,
+      isRegistered: event.Attendees ? event.Attendees.includes(user._id) : false,
+      canManage: event.createdBy._id.toString() === user._id.toString() || 
+                 user.role === 'system_admin' || 
+                 (user.role === 'college_admin' && event.college.includes(user.college))
+    }));
+
     console.log('Found events:', events.length); // Debug log
-    res.status(200).json(events);
+    res.status(200).json({
+      message: 'Events retrieved successfully',
+      count: events.length,
+      events: eventsWithDetails,
+      userRole: user.role,
+      userCollege: user.college
+    });
   } catch (err) {
     console.error('Get dynamic events detailed error:', err); // More detailed error log
     logger.error(`Get dynamic events error: ${err.message}`);
